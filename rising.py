@@ -8,13 +8,11 @@ from datetime import datetime
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
+# 2. 정적 폴더(Static) 경로 설정
 STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), "static")
 ASSETS_PATH = os.path.join(STREAMLIT_STATIC_PATH, "assets")
-try:
-    if not os.path.exists(ASSETS_PATH):
-        os.makedirs(ASSETS_PATH, exist_ok=True)
-except (PermissionError, OSError):
-    pass
+if not os.path.exists(ASSETS_PATH):
+    os.makedirs(ASSETS_PATH)
 
 # [기본 동영상 파일 목록 설정]
 video_files = {
@@ -170,9 +168,20 @@ if st.session_state.logged_in_user:
     u_info = st.session_state.users[st.session_state.logged_in_user]
     st.sidebar.success(f"👤 **{u_info['name']}**님 ({u_info.get('gender', '-')}/{u_info.get('grade', '회원')})")
 
-    if st.sidebar.button("🚪 로그아웃", use_container_width=True):
-        st.session_state.logged_in_user = None
-        st.rerun()
+    # 프로필 수정 팝업/모달 대신 라디오 또는 토글형태 구현을 위해 세션 제어 활용 가능
+    if "show_profile_edit" not in st.session_state:
+        st.session_state.show_profile_edit = False
+
+    col_btn1, col_btn2 = st.sidebar.columns(2)
+    with col_btn1:
+        if st.button("⚙️ 정보수정", use_container_width=True):
+            st.session_state.show_profile_edit = not st.session_state.show_profile_edit
+            st.rerun()
+    with col_btn2:
+        if st.button("🚪 로그아웃", use_container_width=True):
+            st.session_state.logged_in_user = None
+            st.session_state.show_profile_edit = False
+            st.rerun()
 else:
     auth_choice = st.sidebar.radio("로그인 / 회원가입", ["로그인", "회원가입"], key="sb_auth_choice")
     
@@ -234,7 +243,55 @@ else:
                     st.sidebar.warning("모든 항목을 입력해주세요.")
 
 # 6. 메인 페이지 로직
-if main_menu == "홈 (기본 영상)":
+if st.session_state.get("show_profile_edit", False) and st.session_state.logged_in_user:
+    st.title("⚙️ 내 정보 수정 (개인 프로필)")
+    st.write("등록된 회원 정보를 안전하게 수정할 수 있습니다.")
+    st.write("---")
+    
+    cur_u_data = st.session_state.users[st.session_state.logged_in_user]
+    
+    with st.form("profile_edit_form"):
+        st.text_input("아이디 (변경 불가)", value=st.session_state.logged_in_user, disabled=True)
+        edit_pw = st.text_input("새 비밀번호", type="password", value=cur_u_data["pw"])
+        edit_name = st.text_input("실명 (선수 본명)", value=cur_u_data["name"])
+        edit_phone = st.text_input("연락처", value=cur_u_data["phone"])
+        
+        gender_index = 0 if cur_u_data.get("gender", "남자") == "남자" else 1
+        edit_gender = st.radio("👫 성별", ["남자", "여자"], index=gender_index, horizontal=True)
+        
+        curr_yr = datetime.now().year
+        edit_birth = st.number_input("출생연도 (4자리)", min_value=1940, max_value=curr_yr, value=int(cur_u_data.get("birth_year", 2018)), step=1)
+        
+        calc_grade = get_grade_by_birth_year(edit_birth)
+        st.caption(f"💡 수정된 출생연도 기준 자동 분류 학년: **[{calc_grade}]**")
+        
+        col_pe1, col_pe2 = st.columns(2)
+        with col_pe1:
+            btn_save_profile = st.form_submit_button("💾 정보 변경 저장", use_container_width=True)
+        with col_pe2:
+            btn_cancel_profile = st.form_submit_button("❌ 취소", use_container_width=True)
+            
+        if btn_save_profile:
+            if not edit_name.strip() or not edit_phone.strip():
+                st.error("⚠️ 실명과 연락처는 비워둘 수 없습니다.")
+            else:
+                st.session_state.users[st.session_state.logged_in_user].update({
+                    "pw": edit_pw,
+                    "name": edit_name.strip(),
+                    "phone": edit_phone.strip(),
+                    "gender": edit_gender,
+                    "birth_year": int(edit_birth),
+                    "grade": calc_grade
+                })
+                st.session_state.show_profile_edit = False
+                st.success("✅ 회원 정보가 성공적으로 수정되었습니다!")
+                st.rerun()
+                
+        if btn_cancel_profile:
+            st.session_state.show_profile_edit = False
+            st.rerun()
+
+elif main_menu == "홈 (기본 영상)":
     col_title, col_notice = st.columns([1, 1])
     
     with col_title:
@@ -626,7 +683,6 @@ elif main_menu == "2. 대회 사진첩":
 
     st.subheader(f"📂 현재 선택된 대회: {selected_event}")
 
-    # 대회별 탭 구분 (사진첩 vs 입상자 명단)
     folder_tabs = st.tabs(["📸 대회 현장 사진첩", "🏆 대회 입상자 명단"])
 
     with folder_tabs[0]:
@@ -815,7 +871,6 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
         st.stop()
 
     st.markdown("### ⏳ 1. 가입 승인 대기 목록")
-    # 수정된 부분 (괄호 정상화)
     pending_users = [uid for uid, udata in st.session_state.users.items() if udata.get("status") == "pending"]
     
     if pending_users:
@@ -831,7 +886,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.write("---")
     
     st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status") == "approved"]
+    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status"] == "approved"]
     
     if approved_users:
         with st.form("pay_manage_form"):
