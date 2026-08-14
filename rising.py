@@ -9,6 +9,15 @@ import re
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
+# 1-1. 'Press enter to submit form' 글자 숨기기 CSS
+st.markdown("""
+<style>
+.stFormSubmitButton > small {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # 2. 정적 폴더(Static) 경로 설정 (권한 오류 방지 로직 적용)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_PATH = os.path.join(BASE_DIR, "assets")
@@ -219,16 +228,11 @@ else:
             btn_signup = st.form_submit_button("가입 신청", use_container_width=True)
             
             if btn_signup:
-                # 입력값 검증 로직 실행
-                clean_phone = re.sub(r'[^0-9]', '', new_phone) # 숫자만 추출
+                clean_phone = re.sub(r'[^0-9]', '', new_phone)
                 
-                # 1. 아이디 검증: 5글자 이상, 영문 또는 영문+숫자
                 id_valid = bool(re.match(r'^(?=.*[A-Za-z])[A-Za-z0-9]{5,}$', new_id)) or bool(re.match(r'^[A-Za-z]{5,}$', new_id))
-                # 2. 비밀번호 검증: 8글자 이상, 영문+숫자 조합
                 pw_valid = bool(re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', new_pw))
-                # 3. 실명 검증: 오직 한글만
                 name_valid = bool(re.match(r'^[가-힣]+$', new_name))
-                # 4. 연락처 검증: 정확히 숫자 11개
                 phone_valid = (len(clean_phone) == 11)
 
                 if not id_valid:
@@ -934,3 +938,29 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
                 st.rerun()
     else:
         st.info("등록된 승인 회원이 없습니다.")
+
+    st.write("---")
+    
+    # [추가] 관리자용 회원 삭제(강제 탈퇴) 섹션
+    st.markdown("### 🗑️ 3. 회원 강제 탈퇴 및 삭제 (관리자 전용)")
+    all_registered_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin"]
+    
+    if all_registered_users:
+        selected_del_user = st.selectbox(
+            "삭제할 회원을 선택하세요:", 
+            all_registered_users, 
+            format_func=lambda x: f"ID: {x} | 이름: {st.session_state.users[x]['name']} ({st.session_state.users[x].get('grade', '-')}) | 상태: {st.session_state.users[x].get('status')}"
+        )
+        
+        if st.button("⚠️ 선택한 회원 강제 탈퇴 (계정 삭제)", use_container_width=True):
+            del_name = st.session_state.users[selected_del_user]["name"]
+            # 1. users 딕셔너리에서 삭제
+            del st.session_state.users[selected_del_user]
+            # 2. 해당 회원이 기록한 랩타임 기록도 함께 삭제
+            if not st.session_state.lab_records.empty:
+                st.session_state.lab_records = st.session_state.lab_records[st.session_state.lab_records["ID"] != selected_del_user].reset_index(drop=True)
+            
+            st.success(f"🗑️ [{del_name}] 회원의 계정 및 관련 데이터가 영구 삭제되었습니다.")
+            st.rerun()
+    else:
+        st.info("삭제할 수 있는 일반 회원이 없습니다.")
