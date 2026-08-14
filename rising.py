@@ -98,7 +98,7 @@ if "suggestions" not in st.session_state:
 if "users" not in st.session_state:
     st.session_state.users = {
         "admin": {
-            "pw": "icrising2000", "name": "최고관리자", "phone": "010-0000-0000",
+            "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
             "gender": "남자", "birth_year": 1990, "grade": "성인부",
             "role": "admin", "status": "approved",
             "join_date": today_str, "pay_status": "완료"
@@ -168,7 +168,6 @@ if st.session_state.logged_in_user:
     u_info = st.session_state.users[st.session_state.logged_in_user]
     st.sidebar.success(f"👤 **{u_info['name']}**님 ({u_info.get('gender', '-')}/{u_info.get('grade', '회원')})")
 
-    # 프로필 수정 팝업/모달 대신 라디오 또는 토글형태 구현을 위해 세션 제어 활용 가능
     if "show_profile_edit" not in st.session_state:
         st.session_state.show_profile_edit = False
 
@@ -886,7 +885,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.write("---")
     
     st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status"] == "approved"]
+    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status") == "approved"]
     
     if approved_users:
         with st.form("pay_manage_form"):
