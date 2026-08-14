@@ -4,6 +4,7 @@ import shutil
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+import re
 
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
@@ -98,7 +99,7 @@ if "suggestions" not in st.session_state:
 if "users" not in st.session_state:
     st.session_state.users = {
         "admin": {
-            "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
+            "pw": "admin1234", "name": "최고관리자", "phone": "01000000000",
             "gender": "남자", "birth_year": 1990, "grade": "성인부",
             "role": "admin", "status": "approved",
             "join_date": today_str, "pay_status": "완료"
@@ -203,10 +204,10 @@ else:
                     st.sidebar.error("아이디 또는 비밀번호 오류")
     else:
         with st.sidebar.form("sb_signup_form"):
-            new_id = st.text_input("신규 아이디", key="sb_s_id")
-            new_pw = st.text_input("비밀번호", type="password", key="sb_s_pw")
-            new_name = st.text_input("실명 (선수 본명)", placeholder="예: 홍길동", key="sb_s_name")
-            new_phone = st.text_input("연락처 (알림톡용)", placeholder="010-0000-0000", key="sb_s_phone")
+            new_id = st.text_input("신규 아이디", placeholder="영문/숫자 조합 5글자 이상", key="sb_s_id")
+            new_pw = st.text_input("비밀번호", type="password", placeholder="영어+숫자 조합 8글자 이상", key="sb_s_pw")
+            new_name = st.text_input("실명 (선수 본명)", placeholder="한글만 입력 (예: 홍길동)", key="sb_s_name")
+            new_phone = st.text_input("연락처", placeholder="숫자 11개 (예: 01012345678)", key="sb_s_phone")
             new_gender = st.radio("👫 성별 선택", ["남자", "여자"], horizontal=True, key="sb_s_gender")
             
             curr_yr = datetime.now().year
@@ -218,17 +219,34 @@ else:
             btn_signup = st.form_submit_button("가입 신청", use_container_width=True)
             
             if btn_signup:
-                if not new_name.strip() or not new_phone.strip():
-                    st.sidebar.error("⚠️ 실명과 연락처 입력이 필수입니다.")
+                # 입력값 검증 로직 실행
+                clean_phone = re.sub(r'[^0-9]', '', new_phone) # 숫자만 추출
+                
+                # 1. 아이디 검증: 5글자 이상, 영문 또는 영문+숫자
+                id_valid = bool(re.match(r'^(?=.*[A-Za-z])[A-Za-z0-9]{5,}$', new_id)) or bool(re.match(r'^[A-Za-z]{5,}$', new_id))
+                # 2. 비밀번호 검증: 8글자 이상, 영문+숫자 조합
+                pw_valid = bool(re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', new_pw))
+                # 3. 실명 검증: 오직 한글만
+                name_valid = bool(re.match(r'^[가-힣]+$', new_name))
+                # 4. 연락처 검증: 정확히 숫자 11개
+                phone_valid = (len(clean_phone) == 11)
+
+                if not id_valid:
+                    st.sidebar.error("⚠️ 아이디는 영문 포함 5글자 이상(영문 또는 영문+숫자)이어야 합니다.")
+                elif not pw_valid:
+                    st.sidebar.error("⚠️ 비밀번호는 영어와 숫자를 조합하여 8글자 이상이어야 합니다.")
+                elif not name_valid:
+                    st.sidebar.error("⚠️ 실명은 무조건 한글로만 입력해야 합니다.")
+                elif not phone_valid:
+                    st.sidebar.error("⚠️ 연락처는 하이픈(-)을 제외하거나 포함하여 무조건 숫자 11개여야 합니다.")
                 elif new_id in st.session_state.users:
                     st.sidebar.warning("이미 존재하는 아이디입니다.")
-                elif new_id and new_pw:
+                else:
                     reg_date = datetime.now()
-                    
                     st.session_state.users[new_id] = {
                         "pw": new_pw, 
                         "name": new_name.strip(), 
-                        "phone": new_phone.strip(),
+                        "phone": clean_phone,
                         "gender": new_gender,
                         "birth_year": int(birth_yr),
                         "grade": auto_grade,
@@ -237,9 +255,7 @@ else:
                         "join_date": reg_date.strftime("%Y-%m-%d"),
                         "pay_status": "미납"
                     }
-                    st.sidebar.info(f"📩 [{new_gender}/{auto_grade}] 가입 신청 완료! 관리자 승인 후 로그인할 수 있습니다.")
-                else:
-                    st.sidebar.warning("모든 항목을 입력해주세요.")
+                    st.sidebar.success(f"📩 [{new_gender}/{auto_grade}] 가입 신청 완료! 관리자 승인 후 로그인할 수 있습니다.")
 
 # 6. 메인 페이지 로직
 if st.session_state.get("show_profile_edit", False) and st.session_state.logged_in_user:
@@ -251,9 +267,9 @@ if st.session_state.get("show_profile_edit", False) and st.session_state.logged_
     
     with st.form("profile_edit_form"):
         st.text_input("아이디 (변경 불가)", value=st.session_state.logged_in_user, disabled=True)
-        edit_pw = st.text_input("새 비밀번호", type="password", value=cur_u_data["pw"])
-        edit_name = st.text_input("실명 (선수 본명)", value=cur_u_data["name"])
-        edit_phone = st.text_input("연락처", value=cur_u_data["phone"])
+        edit_pw = st.text_input("새 비밀번호 (영어+숫자 조합 8글자 이상)", value=cur_u_data["pw"])
+        edit_name = st.text_input("실명 (한글)", value=cur_u_data["name"])
+        edit_phone = st.text_input("연락처 (숫자 11개)", value=cur_u_data["phone"])
         
         gender_index = 0 if cur_u_data.get("gender", "남자") == "남자" else 1
         edit_gender = st.radio("👫 성별", ["남자", "여자"], index=gender_index, horizontal=True)
@@ -271,13 +287,22 @@ if st.session_state.get("show_profile_edit", False) and st.session_state.logged_
             btn_cancel_profile = st.form_submit_button("❌ 취소", use_container_width=True)
             
         if btn_save_profile:
-            if not edit_name.strip() or not edit_phone.strip():
-                st.error("⚠️ 실명과 연락처는 비워둘 수 없습니다.")
+            clean_edit_phone = re.sub(r'[^0-9]', '', edit_phone)
+            pw_valid = bool(re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', edit_pw))
+            name_valid = bool(re.match(r'^[가-힣]+$', edit_name))
+            phone_valid = (len(clean_edit_phone) == 11)
+
+            if not pw_valid:
+                st.error("⚠️ 비밀번호는 영어와 숫자를 조합하여 8글자 이상이어야 합니다.")
+            elif not name_valid:
+                st.error("⚠️ 실명은 무조건 한글로만 입력해야 합니다.")
+            elif not phone_valid:
+                st.error("⚠️ 연락처는 무조건 숫자 11개여야 합니다.")
             else:
                 st.session_state.users[st.session_state.logged_in_user].update({
                     "pw": edit_pw,
                     "name": edit_name.strip(),
-                    "phone": edit_phone.strip(),
+                    "phone": clean_edit_phone,
                     "gender": edit_gender,
                     "birth_year": int(edit_birth),
                     "grade": calc_grade
