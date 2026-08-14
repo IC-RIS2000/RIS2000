@@ -100,7 +100,7 @@ if "suggestions" not in st.session_state:
 if "users" not in st.session_state:
     st.session_state.users = {
         "admin": {
-            "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
+            "pw": "icrising2000", "name": "최고관리자", "phone": "010-0000-0000",
             "gender": "남자", "birth_year": 1990, "grade": "성인부",
             "role": "admin", "status": "approved",
             "join_date": today_str, "pay_status": "완료"
