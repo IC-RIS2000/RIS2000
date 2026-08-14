@@ -8,11 +8,13 @@ from datetime import datetime
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
-# 2. 정적 폴더(Static) 경로 설정
 STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), "static")
 ASSETS_PATH = os.path.join(STREAMLIT_STATIC_PATH, "assets")
-if not os.path.exists(ASSETS_PATH):
-    os.makedirs(ASSETS_PATH)
+try:
+    if not os.path.exists(ASSETS_PATH):
+        os.makedirs(ASSETS_PATH, exist_ok=True)
+except (PermissionError, OSError):
+    pass
 
 # [기본 동영상 파일 목록 설정]
 video_files = {
