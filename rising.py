@@ -206,7 +206,7 @@ if main_menu == "1. 📊 랩타임 및 기록실":
                         " 주세요."
                     )
 
-    # [탭 2] 개인별 기록 조회 및 최상위/상위권 비교
+    # [탭 2] 개인별 기록 조회 및 최상위/상위권 비교 (꺾은선 그래프 포함)
     with tab_lap2:
         st.subheader("👤 개인별 기록 조회 및 상위권 비교 분석")
 
@@ -223,14 +223,14 @@ if main_menu == "1. 📊 랩타임 및 기록실":
             st.dataframe(df_member, use_container_width=True)
 
             st.write("---")
-            st.markdown("### 🔍 최상위권 / 상위권 기록 비교")
+            st.markdown("### 🔍 최상위권 / 상위권 기록 비교 및 추이 그래프")
 
             unique_events_in_rec = df_member["종목"].unique().tolist()
             comp_event = st.selectbox(
                 "비교할 종목을 선택하세요:", unique_events_in_rec
             )
 
-            sub_df = df_member[df_member["종목"] == comp_event]
+            sub_df = df_member[df_member["종목"] == comp_event].copy()
             if not sub_df.empty:
                 my_latest_record = sub_df.iloc[-1]["기록(초)"]
                 my_best_record = sub_df["기록(초)"].min()
@@ -269,6 +269,12 @@ if main_menu == "1. 📊 랩타임 및 기록실":
                         "💪 꾸준한 훈련을 통해 상위권 기록 진입을 목표로"
                         " 화이팅해 봅시다!"
                     )
+
+                st.write("")
+                st.markdown(f"#### 📈 [{comp_event}] 기록 변화 추이 (꺾은선형)")
+                # 날짜별 꺾은선 그래프 출력을 위해 인덱스를 날짜로 설정
+                chart_df = sub_df.set_index("날짜")[["기록(초)"]]
+                st.line_chart(chart_df)
 
             if is_admin:
                 st.write("---")
