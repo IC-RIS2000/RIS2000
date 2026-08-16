@@ -1,4 +1,5 @@
 from datetime import datetime
+import pandas as pd
 import streamlit as st
 
 # 페이지 기본 설정
@@ -90,7 +91,7 @@ if st.session_state.logged_in_user is None:
                         "name": new_name,
                         "password": new_pw,
                         "role": "member",
-                        "status": "pending",  # 관리자 승인 대기
+                        "status": "pending",
                         "gender": new_gender,
                         "grade": new_grade,
                         "phone": new_phone,
@@ -110,7 +111,6 @@ else:
         st.rerun()
 
 st.sidebar.write("---")
-# 메인 메뉴 선택
 main_menu = st.sidebar.radio(
     "메인 메뉴",
     [
@@ -121,7 +121,6 @@ main_menu = st.sidebar.radio(
     ],
 )
 
-# 권한 체크용 변수
 current_id = st.session_state.logged_in_user
 is_admin = (
     current_id
@@ -135,68 +134,163 @@ is_admin = (
 
 # --- 메뉴 1: 랩타임 및 기록실 ---
 if main_menu == "1. 📊 랩타임 및 기록실":
-  st.title("📊 랩타임 및 훈련 기록실")
-  st.write("클럽 회원의 기록을 측정하고 벤치마크와 비교해 보세요.")
-  st.write("---")
-
-  # 랩타임 및 벤치마크 관련 콘텐츠 영역 구현
-  tab1, tab2 = st.tabs(["⏱️ 랩타임 기록 측정", "📈 벤치마크 DB"])
-
-  with tab1:
-    st.subheader("⏱️ 실시간 랩타임 측정")
-    st.info(
-        "개인별 랩타임 데이터를 기록하고 시각화할 수 있는 공간입니다. (기능"
-        " 확장 가능)"
-    )
-
-  with tab2:
-    st.subheader("📈 클럽 벤치마크 기준표")
+    st.title("📊 랩타임 및 기록실")
     st.write(
-        "연령대 및 종목별 기준 기록을 관리하고 조회하는 데이터베이스입니다."
+        "클럽 회원의 훈련 랩타임을 측정하고 벤치마크 기록과 비교할 수"
+        " 있습니다."
     )
+    st.write("---")
+
+    tab_lap1, tab_lap2 = st.tabs(["⏱️ 랩타임 기록 측정", "📈 벤치마크 DB"])
+
+    with tab_lap1:
+        st.subheader("⏱️ 개인별 랩타임 기록 입력")
+
+        approved_members = [
+            udata["name"]
+            for uid, udata in st.session_state.users.items()
+            if udata.get("status") == "approved"
+        ]
+        if not approved_members:
+            approved_members = ["등록된 회원 없음"]
+
+        with st.form("lap_record_form", clear_on_submit=True):
+            l_col1, l_col2, l_col3 = st.columns(3)
+            with l_col1:
+                sel_member = st.selectbox("선수 선택", approved_members)
+            with l_col2:
+                sel_distance = st.selectbox(
+                    "측정 거리 / 종목",
+                    ["100m", "200m", "300m", "500m", "1,000m", "1,500m"],
+                )
+            with l_col3:
+                sel_time = st.text_input(
+                    "기록 (예: 45.2초 또는 1분 12초)", placeholder="기록 입력"
+                )
+
+            btn_save_lap = st.form_submit_button(
+                "💾 랩타임 기록 저장", use_container_width=True
+            )
+            if btn_save_lap:
+                if sel_member != "등록된 회원 없음" and sel_time.strip():
+                    if sel_member not in st.session_state.lap_records:
+                        st.session_state.lap_records[sel_member] = []
+                    st.session_state.lap_records[sel_member].append({
+                        "종목": sel_distance,
+                        "기록": sel_time.strip(),
+                        "측정일": datetime.now().strftime("%Y-%m-%d"),
+                    })
+                    st.success(
+                        f"✅ [{sel_member}] 선수의 {sel_distance} 기록이"
+                        " 저장되었습니다!"
+                    )
+                    st.rerun()
+                else:
+                    st.warning("⚠️ 선수 이름과 기록을 올바르게 입력해 주세요.")
+
+        st.write("---")
+        st.subheader("📋 선수별 랩타임 기록 조회")
+        if st.session_state.lap_records:
+            view_member = st.selectbox(
+                "조회할 선수를 선택하세요:",
+                list(st.session_state.lap_records.keys()),
+            )
+            member_recs = st.session_state.lap_records[view_member]
+
+            df_laps = pd.DataFrame(member_recs)
+            st.dataframe(df_laps, use_container_width=True)
+
+            if is_admin and st.button("🗑️ 해당 선수 기록 초기화"):
+                del st.session_state.lap_records[view_member]
+                st.success(f"[{view_member}] 선수의 모든 기록이 삭제되었습니다.")
+                st.rerun()
+        else:
+            st.info("💡 아직 저장된 랩타임 기록이 없습니다.")
+
+    with tab_lap2:
+        st.subheader("📈 클럽 벤치마크 기준표")
+        st.write("연령대 및 학년별 권장 기준 기록입니다.")
+
+        # 벤치마크 기본 데이터 예시 출력
+        bm_data = {
+            "종목": ["100m", "300m", "500m", "1,000m"],
+            "초등 저학년": ["18.5초", "55.0초", "1분 35초", "3분 20초"],
+            "초등 고학년": ["15.2초", "48.1초", "1분 20초", "2분 50초"],
+            "중고등부": ["13.0초", "42.0초", "1분 10초", "2분 30초"],
+        }
+        st.dataframe(pd.DataFrame(bm_data), use_container_width=True)
 
 
 # --- 메뉴 2: 대회 정보 및 입상자 ---
 elif main_menu == "2. 🏆 대회 정보 및 입상자":
-  st.title("🏆 대회 정보 및 입상자 명단")
-  st.write(
-      "클럽 선수들이 출전한 대회 정보와 빛나는 입상 내역을 확인할 수"
-      " 있습니다."
-  )
-  st.write("---")
-
-  # 대회 선택 상자 (예시 대회 리스트)
-  events_list = [
-      "2026년 전국 인라인 스케이트 대회",
-      "제1회 클럽 자체 평가전",
-      "2025년 하반기 시합",
-  ]
-  selected_event = st.selectbox("조회할 대회를 선택하세요:", events_list)
-
-  if selected_event not in st.session_state.competition_winners:
-    st.session_state.competition_winners[selected_event] = []
-
-  folder_tabs = st.tabs(["📁 대회 개요 및 사진", "🏆 입상자 명단"])
-
-  with folder_tabs[0]:
-    st.markdown(f"### 📌 [{selected_event}] 대회 개요")
-    st.write("대회 일정, 장소, 출전 선수 안내 및 현장 포토 갤러리입니다.")
-
-  with folder_tabs[1]:
-    st.markdown(f"### 🏆 [{selected_event}] 영광의 입상자 명단")
-    st.write("이번 대회에서 멋진 성적을 거둔 우리 클럽 선수들을 축하합니다! 🎉")
+    st.title("🏆 대회 정보 및 입상자 명단")
+    st.write(
+        "클럽 선수들이 출전한 대회 정보와 빛나는 입상 내역을 확인할 수"
+        " 있습니다."
+    )
     st.write("---")
 
-    winners = st.session_state.competition_winners.get(selected_event, [])
+    events_list = [
+        "2026년 전국 인라인 스케이트 대회",
+        "제1회 클럽 자체 평가전",
+        "2025년 하반기 시합",
+    ]
+    selected_event = st.selectbox("조회할 대회를 선택하세요:", events_list)
 
-    if winners:
-      display_winners = []
-      for w in winners:
-        display_winners.append(
-            {"이름": w.get("이름"), "순위": w.get("순위"), "종목": w.get("종목")}
-        )
+    if selected_event not in st.session_state.competition_winners:
+        st.session_state.competition_winners[selected_event] = []
 
-      centered_table_css = """
+    folder_tabs = st.tabs(["📁 대회 개요 및 사진", "🏆 입상자 명단"])
+
+    with folder_tabs[0]:
+        st.markdown(f"### 📌 [{selected_event}] 대회 개요")
+        st.write("대회 일정, 장소, 출전 선수 안내 및 현장 포토 갤러리입니다.")
+
+        if is_admin:
+            st.write("---")
+            st.markdown("#### 📷 현장 사진 업로드 (관리자 전용)")
+            uploaded_photo = st.file_uploader(
+                "대회 현장 사진 선택",
+                type=["jpg", "jpeg", "png"],
+                key=f"photo_up_{selected_event}",
+            )
+            if uploaded_photo is not None:
+                if selected_event not in st.session_state.event_photos:
+                    st.session_state.event_photos[selected_event] = []
+                st.session_state.event_photos[selected_event].append(
+                    uploaded_photo
+                )
+                st.success("사진이 성공적으로 업로드되었습니다!")
+
+        # 갤러리 출력
+        photos = st.session_state.event_photos.get(selected_event, [])
+        if photos:
+            st.write("---")
+            st.markdown("#### 🖼️ 대회 포토 갤러리")
+            p_cols = st.columns(3)
+            for idx, p in enumerate(photos):
+                with p_cols[idx % 3]:
+                    st.image(p, caption=f"현장 사진 {idx+1}", use_container_width=True)
+        else:
+            st.info("💡 등록된 현장 사진이 없습니다.")
+
+    with folder_tabs[1]:
+        st.markdown(f"### 🏆 [{selected_event}] 영광의 입상자 명단")
+        st.write("이번 대회에서 멋진 성적을 거둔 우리 클럽 선수들을 축하합니다! 🎉")
+        st.write("---")
+
+        winners = st.session_state.competition_winners.get(selected_event, [])
+
+        if winners:
+            display_winners = []
+            for w in winners:
+                display_winners.append({
+                    "이름": w.get("이름"),
+                    "순위": w.get("순위"),
+                    "종목": w.get("종목"),
+                })
+
+            centered_table_css = """
             <style>
             .winner-table-container { width: 100%; overflow-x: auto; margin-top: 10px; }
             .winner-table { width: 100%; border-collapse: collapse; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; }
@@ -206,266 +300,285 @@ elif main_menu == "2. 🏆 대회 정보 및 입상자":
             .winner-table tr:hover { background-color: #e9ecef; }
             </style>
             """
-      table_html = (
-          centered_table_css
-          + '<div class="winner-table-container"><table'
-          ' class="winner-table">'
-      )
-      table_html += (
-          "<thead><tr><th>이름</th><th>순위</th><th>종목</th></tr></thead><tbody>"
-      )
-
-      for row in display_winners:
-        table_html += f"<tr><td>{row['이름']}</td><td>{row['순위']}</td><td>{row['종목']}</td></tr>"
-
-      table_html += "</tbody></table></div>"
-      st.markdown(table_html, unsafe_allow_html=True)
-    else:
-      st.info("💡 아직 등록된 입상자 정보가 없습니다.")
-
-    if is_admin:
-      st.write("---")
-      st.markdown("#### ➕ 입상자 등록 (관리자 전용)")
-
-      all_club_members = [
-          udata["name"]
-          for uid, udata in st.session_state.users.items()
-          if udata.get("name")
-      ]
-      if not all_club_members:
-        all_club_members = ["등록된 회원 없음"]
-
-      with st.form(f"winner_add_form_{selected_event}", clear_on_submit=True):
-        w_col1, w_col2, w_col3 = st.columns(3)
-        with w_col1:
-          w_name = st.selectbox("선수 이름", all_club_members)
-        with w_col2:
-          w_award = st.selectbox(
-              "순위",
-              [
-                  "1위 (금메달)",
-                  "2위 (은메달)",
-                  "3위 (동메달)",
-                  "최우수상",
-                  "우수상",
-                  "장려상",
-                  "입상",
-              ],
-          )
-        with w_col3:
-          w_event = st.selectbox(
-              "종목",
-              [
-                  "100m",
-                  "200m",
-                  "300m",
-                  "500m",
-                  "1,000m",
-                  "1,500m",
-                  "초등 저학년부 500m",
-                  "초등 고학년부 1,000m",
-              ],
-          )
-
-        btn_add_winner = st.form_submit_button(
-            "🌟 입상자 등록하기", use_container_width=True
-        )
-        if btn_add_winner:
-          if w_name != "등록된 회원 없음":
-            st.session_state.competition_winners[selected_event].append({
-                "이름": w_name,
-                "순위": w_award,
-                "종목": w_event,
-                "등록일": datetime.now().strftime("%Y-%m-%d"),
-            })
-            st.success(
-                f"✅ [{w_name}] 선수의 입상 정보가 성공적으로 등록되었습니다!"
+            table_html = (
+                centered_table_css
+                + '<div class="winner-table-container"><table'
+                ' class="winner-table">'
             )
-            st.rerun()
-          else:
-            st.warning("⚠️ 등록된 선수가 없습니다.")
+            table_html += (
+                "<thead><tr><th>이름</th><th>순위</th><th>종목</th></tr></thead><tbody>"
+            )
 
-      if winners:
-        st.write("")
-        st.markdown("#### 🗑️ 입상자 삭제 (관리자 전용)")
-        del_win_idx = st.selectbox(
-            "삭제할 입상자를 선택하세요:",
-            range(len(winners)),
-            format_func=lambda i: f"👤 {winners[i]['이름']} - 🥇"
-            f" {winners[i]['순위']} ({winners[i].get('종목', winners[i].get('종목 및 부서', '-'))})",
-            key=f"del_win_select_{selected_event}",
-        )
-        if st.button(
-            "선택 입상자 정보 삭제", key=f"btn_del_win_{selected_event}"
-        ):
-          st.session_state.competition_winners[selected_event].pop(del_win_idx)
-          st.success("선택한 입상자 정보가 삭제되었습니다.")
-          st.rerun()
+            for row in display_winners:
+                table_html += f"<tr><td>{row['이름']}</td><td>{row['순위']}</td><td>{row['종목']}</td></tr>"
+
+            table_html += "</tbody></table></div>"
+            st.markdown(table_html, unsafe_allow_html=True)
+        else:
+            st.info("💡 아직 등록된 입상자 정보가 없습니다.")
+
+        if is_admin:
+            st.write("---")
+            st.markdown("#### ➕ 입상자 등록 (관리자 전용)")
+
+            all_club_members = [
+                udata["name"]
+                for uid, udata in st.session_state.users.items()
+                if udata.get("name")
+            ]
+            if not all_club_members:
+                all_club_members = ["등록된 회원 없음"]
+
+            with st.form(f"winner_add_form_{selected_event}", clear_on_submit=True):
+                w_col1, w_col2, w_col3 = st.columns(3)
+                with w_col1:
+                    w_name = st.selectbox("선수 이름", all_club_members)
+                with w_col2:
+                    w_award = st.selectbox(
+                        "순위",
+                        [
+                            "1위 (금메달)",
+                            "2위 (은메달)",
+                            "3위 (동메달)",
+                            "최우수상",
+                            "우수상",
+                            "장려상",
+                            "입상",
+                        ],
+                    )
+                with w_col3:
+                    w_event = st.selectbox(
+                        "종목",
+                        [
+                            "100m",
+                            "200m",
+                            "300m",
+                            "500m",
+                            "1,000m",
+                            "1,500m",
+                            "초등 저학년부 500m",
+                            "초등 고학년부 1,000m",
+                        ],
+                    )
+
+                btn_add_winner = st.form_submit_button(
+                    "🌟 입상자 등록하기", use_container_width=True
+                )
+                if btn_add_winner:
+                    if w_name != "등록된 회원 없음":
+                        st.session_state.competition_winners[
+                            selected_event
+                        ].append({
+                            "이름": w_name,
+                            "순위": w_award,
+                            "종목": w_event,
+                            "등록일": datetime.now().strftime("%Y-%m-%d"),
+                        })
+                        st.success(
+                            f"✅ [{w_name}] 선수의 입상 정보가 성공적으로"
+                            " 등록되었습니다!"
+                        )
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ 등록된 선수가 없습니다.")
+
+            if winners:
+                st.write("")
+                st.markdown("#### 🗑️ 입상자 삭제 (관리자 전용)")
+                del_win_idx = st.selectbox(
+                    "삭제할 입상자를 선택하세요:",
+                    range(len(winners)),
+                    format_func=lambda i: f"👤 {winners[i]['이름']} - 🥇"
+                    f" {winners[i]['순위']} ({winners[i].get('종목', winners[i].get('종목 및 부서', '-'))})",
+                    key=f"del_win_select_{selected_event}",
+                )
+                if st.button(
+                    "선택 입상자 정보 삭제", key=f"btn_del_win_{selected_event}"
+                ):
+                    st.session_state.competition_winners[selected_event].pop(
+                        del_win_idx
+                    )
+                    st.success("선택한 입상자 정보가 삭제되었습니다.")
+                    st.rerun()
 
 
 # --- 메뉴 3: 건의사항 ---
 elif main_menu == "3. 💡 건의사항":
-  st.title("💡 무기명 건의사항함")
-  st.write(
-      "클럽 운영 및 시설 등 자유롭게 의견을 제출해 주세요. 작성자의 정보나"
-      " 제출 시각은 전혀 기록되지 않습니다."
-  )
-  st.write("---")
-
-  if is_admin:
-    st.markdown("### 🔒 [관리자 전용] 건의사항 목록 및 피드백 작성")
-    st.info(
-        "※ 관리자 계정에서는 건의사항 작성란이 노출되지 않으며, 등록된 건의 내용"
-        " 확인 및 피드백 작성만 가능합니다."
+    st.title("💡 무기명 건의사항함")
+    st.write(
+        "클럽 운영 및 시설 등 자유롭게 의견을 제출해 주세요. 작성자의 정보나"
+        " 제출 시각은 전혀 기록되지 않습니다."
     )
     st.write("---")
 
-    if st.session_state.suggestions:
-      for idx, item in enumerate(st.session_state.suggestions):
-        with st.expander(f"📌 [{idx+1}] {item['title']}"):
-          st.markdown("**건의 내용:**")
-          st.write(item["content"])
-          st.write("---")
-
-          fb_text = st.text_area(
-              "💬 관리자 Feedback (피드백 작성)",
-              value=item.get("feedback", ""),
-              key=f"fb_input_{idx}",
-              height=100,
-          )
-
-          c_btn1, c_btn2 = st.columns([1, 1])
-          with c_btn1:
-            if st.button(
-                f"💾 피드백 저장", key=f"save_fb_{idx}", use_container_width=True
-            ):
-              st.session_state.suggestions[idx]["feedback"] = fb_text.strip()
-              st.success("피드백이 저장되었습니다.")
-              st.rerun()
-          with c_btn2:
-            if st.button(
-                f"🗑️ 건의사항 삭제", key=f"del_sug_{idx}", use_container_width=True
-            ):
-              st.session_state.suggestions.pop(idx)
-              st.success("해당 건의사항이 삭제되었습니다.")
-              st.rerun()
-    else:
-      st.info("현재 등록된 건의사항이 없습니다.")
-
-  else:
-    if not st.session_state.logged_in_user:
-      st.warning(
-          "🔒 건의사항은 **로그인한 승인 회원**만 작성할 수 있습니다. 왼쪽"
-          " 사이드바 하단에서 로그인해 주세요."
-      )
-    else:
-      current_user_status = st.session_state.users[current_id].get("status")
-      if current_user_status != "approved":
-        st.warning(
-            "⏳ 관리자 가입 승인 대기 중인 회원입니다. 승인 완료 후 건의사항을"
-            " 작성하실 수 있습니다."
+    if is_admin:
+        st.markdown("### 🔒 [관리자 전용] 건의사항 목록 및 피드백 작성")
+        st.info(
+            "※ 관리자 계정에서는 건의사항 작성란이 노출되지 않으며, 등록된 건의 내용"
+            " 확인 및 피드백 작성만 가능합니다."
         )
-      else:
-        st.markdown("### ✍️ 건의사항 작성 (익명)")
-        with st.form("suggestion_form", clear_on_submit=True):
-          s_title = st.text_input("제목", placeholder="건의사항 제목을 입력하세요")
-          s_content = st.text_area(
-              "내용",
-              placeholder="개선되었으면 하는 점이나 의견을 자유롭게 작성해 주세요.",
-              height=150,
-          )
-          btn_submit_s = st.form_submit_button(
-              "📩 무기명 제출하기", use_container_width=True
-          )
+        st.write("---")
 
-          if btn_submit_s:
-            if s_title.strip() and s_content.strip():
-              st.session_state.suggestions.append({
-                  "title": s_title.strip(),
-                  "content": s_content.strip(),
-                  "feedback": "",
-              })
-              st.success("✅ 건의사항이 성공적으로 제출되었습니다.")
+        if st.session_state.suggestions:
+            for idx, item in enumerate(st.session_state.suggestions):
+                with st.expander(f"📌 [{idx+1}] {item['title']}"):
+                    st.markdown("**건의 내용:**")
+                    st.write(item["content"])
+                    st.write("---")
+
+                    fb_text = st.text_area(
+                        "💬 관리자 Feedback (피드백 작성)",
+                        value=item.get("feedback", ""),
+                        key=f"fb_input_{idx}",
+                        height=100,
+                    )
+
+                    c_btn1, c_btn2 = st.columns([1, 1])
+                    with c_btn1:
+                        if st.button(
+                            f"💾 피드백 저장",
+                            key=f"save_fb_{idx}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.suggestions[idx]["feedback"] = (
+                                fb_text.strip()
+                            )
+                            st.success("피드백이 저장되었습니다.")
+                            st.rerun()
+                    with c_btn2:
+                        if st.button(
+                            f"🗑️ 건의사항 삭제",
+                            key=f"del_sug_{idx}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.suggestions.pop(idx)
+                            st.success("해당 건의사항이 삭제되었습니다.")
+                            st.rerun()
+        else:
+            st.info("현재 등록된 건의사항이 없습니다.")
+
+    else:
+        if not st.session_state.logged_in_user:
+            st.warning(
+                "🔒 건의사항은 **로그인한 승인 회원**만 작성할 수 있습니다. 왼쪽"
+                " 사이드바 하단에서 로그인해 주세요."
+            )
+        else:
+            current_user_status = st.session_state.users[current_id].get(
+                "status"
+            )
+            if current_user_status != "approved":
+                st.warning(
+                    "⏳ 관리자 가입 승인 대기 중인 회원입니다. 승인 완료 후 건의사항을"
+                    " 작성하실 수 있습니다."
+                )
             else:
-              st.warning("⚠️ 제목과 내용을 모두 입력해 주세요.")
+                st.markdown("### ✍️ 건의사항 작성 (익명)")
+                with st.form("suggestion_form", clear_on_submit=True):
+                    s_title = st.text_input(
+                        "제목", placeholder="건의사항 제목을 입력하세요"
+                    )
+                    s_content = st.text_area(
+                        "내용",
+                        placeholder="개선되었으면 하는 점이나 의견을 자유롭게 작성해 주세요.",
+                        height=150,
+                    )
+                    btn_submit_s = st.form_submit_button(
+                        "📩 무기명 제출하기", use_container_width=True
+                    )
+
+                    if btn_submit_s:
+                        if s_title.strip() and s_content.strip():
+                            st.session_state.suggestions.append({
+                                "title": s_title.strip(),
+                                "content": s_content.strip(),
+                                "feedback": "",
+                            })
+                            st.success(
+                                "✅ 건의사항이 성공적으로 제출되었습니다."
+                            )
+                        else:
+                            st.warning("⚠️ 제목과 내용을 모두 입력해 주세요.")
 
 
 # --- 메뉴 4: 회원 승인 및 관리 ---
 elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
-  st.title("👥 회원 승인 및 학원비 관리")
-  st.write(
-      "회원의 가입 승인 처리, 연락처, 성별 및 **월 학원비 납부 상태**를"
-      " 관리합니다."
-  )
-  st.write("---")
-
-  if not is_admin:
-    st.error("🔒 관리자 권한이 필요합니다.")
-    st.stop()
-
-  st.markdown("### ⏳ 1. 가입 승인 대기 목록")
-  pending_users = [
-      uid
-      for uid, udata in st.session_state.users.items()
-      if udata.get("status") == "pending"
-  ]
-
-  if pending_users:
-    p_col1, p_col2 = st.columns([3, 1])
-    selected_p_user = p_col1.selectbox(
-        "승인할 회원을 선택하세요:",
-        pending_users,
-        format_func=lambda x: f"ID: {x} | 이름:"
-        f" {st.session_state.users[x]['name']}"
-        f" ({st.session_state.users[x].get('gender', '-')}/{st.session_state.users[x].get('grade', '-')})"
-        f" | 연락처: {st.session_state.users[x].get('phone')}",
+    st.title("👥 회원 승인 및 학원비 관리")
+    st.write(
+        "회원의 가입 승인 처리, 연락처, 성별 및 **월 학원비 납부 상태**를"
+        " 관리합니다."
     )
-    if p_col2.button("✅ 선택 회원 승인", use_container_width=True):
-      st.session_state.users[selected_p_user]["status"] = "approved"
-      st.success(
-          f"🎉 [{st.session_state.users[selected_p_user]['name']}] 회원이 정상"
-          " 승인되었습니다!"
-      )
-      st.rerun()
-  else:
-    st.info("현재 승인 대기 중인 신청이 없습니다.")
+    st.write("---")
 
-  st.write("---")
+    if not is_admin:
+        st.error("🔒 관리자 권한이 필요합니다.")
+        st.stop()
 
-  st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-  approved_users = [
-      uid
-      for uid, udata in st.session_state.users.items()
-      if udata.get("role") != "admin" and udata.get("status") == "approved"
-  ]
+    st.markdown("### ⏳ 1. 가입 승인 대기 목록")
+    pending_users = [
+        uid
+        for uid, udata in st.session_state.users.items()
+        if udata.get("status") == "pending"
+    ]
 
-  if approved_users:
-    with st.form("pay_manage_form"):
-      selected_m_user = st.selectbox(
-          "관리할 회원을 선택하세요:",
-          approved_users,
-          format_func=lambda x: f"이름:"
-          f" {st.session_state.users[x]['name']}"
-          f" ({st.session_state.users[x].get('grade', '-')}) | 현재 상태:"
-          f" {st.session_state.users[x].get('pay_status', '미납')}",
-      )
-      m_user_info = st.session_state.users[selected_m_user]
-
-      new_pay_status = st.selectbox(
-          "납부 상태 설정",
-          ["완료", "미납"],
-          index=0 if m_user_info.get("pay_status") == "완료" else 1,
-      )
-
-      btn_update_pay = st.form_submit_button(
-          "상태 업데이트", use_container_width=True
-      )
-      if btn_update_pay:
-        st.session_state.users[selected_m_user]["pay_status"] = new_pay_status
-        st.success(
-            f"✅ [{m_user_info['name']}] 회원의 학원비 납부 상태가"
-            f" [{new_pay_status}](으)로 변경되었습니다."
+    if pending_users:
+        p_col1, p_col2 = st.columns([3, 1])
+        selected_p_user = p_col1.selectbox(
+            "승인할 회원을 선택하세요:",
+            pending_users,
+            format_func=lambda x: f"ID: {x} | 이름:"
+            f" {st.session_state.users[x]['name']}"
+            f" ({st.session_state.users[x].get('gender', '-')}/{st.session_state.users[x].get('grade', '-')})"
+            f" | 연락처: {st.session_state.users[x].get('phone')}",
         )
-        st.rerun()
-  else:
-    st.info("등록된 승인 회원이 없습니다.")
+        if p_col2.button("✅ 선택 회원 승인", use_container_width=True):
+            st.session_state.users[selected_p_user]["status"] = "approved"
+            st.success(
+                f"🎉 [{st.session_state.users[selected_p_user]['name']}] 회원이 정상"
+                " 승인되었습니다!"
+            )
+            st.rerun()
+    else:
+        st.info("현재 승인 대기 중인 신청이 없습니다.")
+
+    st.write("---")
+
+    st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
+    approved_users = [
+        uid
+        for uid, udata in st.session_state.users.items()
+        if udata.get("role") != "admin" and udata.get("status") == "approved"
+    ]
+
+    if approved_users:
+        with st.form("pay_manage_form"):
+            selected_m_user = st.selectbox(
+                "관리할 회원을 선택하세요:",
+                approved_users,
+                format_func=lambda x: f"이름:"
+                f" {st.session_state.users[x]['name']}"
+                f" ({st.session_state.users[x].get('grade', '-')}) | 현재 상태:"
+                f" {st.session_state.users[x].get('pay_status', '미납')}",
+            )
+            m_user_info = st.session_state.users[selected_m_user]
+
+            new_pay_status = st.selectbox(
+                "납부 상태 설정",
+                ["완료", "미납"],
+                index=0 if m_user_info.get("pay_status") == "완료" else 1,
+            )
+
+            btn_update_pay = st.form_submit_button(
+                "상태 업데이트", use_container_width=True
+            )
+            if btn_update_pay:
+                st.session_state.users[selected_m_user]["pay_status"] = (
+                    new_pay_status
+                )
+                st.success(
+                    f"✅ [{m_user_info['name']}] 회원의 학원비 납부 상태가"
+                    f" [{new_pay_status}](으)로 변경되었습니다."
+                )
+                st.rerun()
+    else:
+        st.info("등록된 승인 회원이 없습니다.")
