@@ -728,7 +728,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.write("---")
     
     st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status"] == "approved")
+    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status") == "approved"]
     
     if approved_users:
         with st.form("pay_manage_form"):
