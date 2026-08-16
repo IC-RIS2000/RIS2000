@@ -28,7 +28,15 @@ if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
 
 if "benchmark_db" not in st.session_state:
-    st.session_state.benchmark_db = {}
+    # 예시 벤치마크 (최상위권 / 상위권 기준 기록 - 초 단위 등)
+    st.session_state.benchmark_db = {
+        "100m": {"최상위권": 13.5, "상위권": 15.0},
+        "200m": {"최상위권": 26.0, "상위권": 29.0},
+        "300m": {"최상위권": 38.5, "상위권": 43.0},
+        "500m": {"최상위권": 52.0, "상위권": 58.0},
+        "1,000m": {"최상위권": 115.0, "상위권": 130.0},
+        "1,500m": {"최상위권": 180.0, "상위권": 200.0},
+    }
 
 if "lap_records" not in st.session_state:
     st.session_state.lap_records = {}
@@ -134,18 +142,22 @@ is_admin = (
 
 # --- 메뉴 1: 랩타임 및 기록실 ---
 if main_menu == "1. 📊 랩타임 및 기록실":
-    st.title("📊 랩타임 및 기록실")
+    st.title("📊 랩타임 측정 및 개인별 비교 기록실")
     st.write(
-        "클럽 회원의 훈련 랩타임을 측정하고 벤치마크 기록과 비교할 수"
-        " 있습니다."
+        "날짜별 랩타임 측정 데이터를 기록하고, 개인별 성장 추이 조회 및"
+        " 최상위·상위권 기준 기록과 비교할 수 있습니다."
     )
     st.write("---")
 
-    tab_lap1, tab_lap2 = st.tabs(["⏱️ 랩타임 기록 측정", "📈 벤치마크 DB"])
+    tab_lap1, tab_lap2, tab_lap3 = st.tabs([
+        "⏱️ 날짜별 랩타임 측정 및 등록",
+        "👤 개인별 기록 조회 및 비교",
+        "📈 벤치마크 기준 관리",
+    ])
 
+    # [탭 1] 날짜별 랩타임 측정 및 등록
     with tab_lap1:
-        st.subheader("⏱️ 개인별 랩타임 기록 입력")
-
+        st.subheader("⏱️ 훈련 랩타임 신규 등록")
         approved_members = [
             udata["name"]
             for uid, udata in st.session_state.users.items()
@@ -155,70 +167,176 @@ if main_menu == "1. 📊 랩타임 및 기록실":
             approved_members = ["등록된 회원 없음"]
 
         with st.form("lap_record_form", clear_on_submit=True):
-            l_col1, l_col2, l_col3 = st.columns(3)
-            with l_col1:
+            r_col1, r_col2, r_col3, r_col4 = st.columns(4)
+            with r_col1:
                 sel_member = st.selectbox("선수 선택", approved_members)
-            with l_col2:
+            with r_col2:
+                sel_date = st.date_input(
+                    "측정 일자", value=datetime.today()
+                )
+            with r_col3:
                 sel_distance = st.selectbox(
-                    "측정 거리 / 종목",
+                    "측정 종목",
                     ["100m", "200m", "300m", "500m", "1,000m", "1,500m"],
                 )
-            with l_col3:
-                sel_time = st.text_input(
-                    "기록 (예: 45.2초 또는 1분 12초)", placeholder="기록 입력"
+            with r_col4:
+                sel_sec = st.number_input(
+                    "기록 (초 단위, 예: 45.2)", min_value=0.0, format="%.2f"
                 )
 
             btn_save_lap = st.form_submit_button(
                 "💾 랩타임 기록 저장", use_container_width=True
             )
             if btn_save_lap:
-                if sel_member != "등록된 회원 없음" and sel_time.strip():
+                if sel_member != "등록된 회원 없음" and sel_sec > 0:
                     if sel_member not in st.session_state.lap_records:
                         st.session_state.lap_records[sel_member] = []
+
                     st.session_state.lap_records[sel_member].append({
+                        "날짜": sel_date.strftime("%Y-%m-%d"),
                         "종목": sel_distance,
-                        "기록": sel_time.strip(),
-                        "측정일": datetime.now().strftime("%Y-%m-%d"),
+                        "기록(초)": sel_sec,
                     })
                     st.success(
-                        f"✅ [{sel_member}] 선수의 {sel_distance} 기록이"
-                        " 저장되었습니다!"
+                        f"✅ [{sel_member}] 선수의 {sel_distance} 기록"
+                        f" ({sel_sec}초)이 저장되었습니다!"
                     )
                     st.rerun()
                 else:
-                    st.warning("⚠️ 선수 이름과 기록을 올바르게 입력해 주세요.")
+                    st.warning(
+                        "⚠️ 올바른 선수 이름과 0보다 큰 기록(초)을 입력해"
+                        " 주세요."
+                    )
 
-        st.write("---")
-        st.subheader("📋 선수별 랩타임 기록 조회")
+    # [탭 2] 개인별 기록 조회 및 최상위/상위권 비교
+    with tab_lap2:
+        st.subheader("👤 개인별 기록 조회 및 상위권 비교 분석")
+
         if st.session_state.lap_records:
+            all_recorded_members = list(st.session_state.lap_records.keys())
             view_member = st.selectbox(
-                "조회할 선수를 선택하세요:",
-                list(st.session_state.lap_records.keys()),
+                "조회할 선수를 선택하세요:", all_recorded_members
             )
-            member_recs = st.session_state.lap_records[view_member]
 
-            df_laps = pd.DataFrame(member_recs)
-            st.dataframe(df_laps, use_container_width=True)
+            member_data = st.session_state.lap_records[view_member]
+            df_member = pd.DataFrame(member_data)
 
-            if is_admin and st.button("🗑️ 해당 선수 기록 초기화"):
-                del st.session_state.lap_records[view_member]
-                st.success(f"[{view_member}] 선수의 모든 기록이 삭제되었습니다.")
-                st.rerun()
+            st.markdown(f"### 📋 [{view_member}] 선수의 전체 훈련 기록")
+            st.dataframe(df_member, use_container_width=True)
+
+            st.write("---")
+            st.markdown("### 🔍 최상위권 / 상위권 기록 비교")
+
+            # 종목별 비교 선택
+            unique_events_in_rec = df_member["종목"].unique().tolist()
+            comp_event = st.selectbox(
+                "비교할 종목을 선택하세요:", unique_events_in_rec
+            )
+
+            # 해당 종목의 최신(또는 최고) 기록 가져오기
+            sub_df = df_member[df_member["종목"] == comp_event]
+            if not sub_df.empty:
+                my_latest_record = sub_df.iloc[-1][
+                    "기록(초)"
+                ]  # 가장 최근 기록 기준 예시
+                my_best_record = sub_df["기록(초)"].min()  # 개인 최고 기록
+
+                col_c1, col_c2, col_c3 = st.columns(3)
+                col_c1.metric(
+                    label="내 최근 기록", value=f"{my_latest_record} 초"
+                )
+                col_c2.metric(
+                    label="내 개인 최고 기록(PB)", value=f"{my_best_record} 초"
+                )
+
+                # 벤치마크 기준 비교
+                bm_info = st.session_state.benchmark_db.get(comp_event, {})
+                top_record = bm_info.get("최상위권", 0)
+                high_record = bm_info.get("상위권", 0)
+
+                col_c3.markdown(
+                    f"**🏆 기준 비교 ({comp_event})**<br>"
+                    f"- 최상위권 기준: **{top_record}초**<br>"
+                    f"- 상위권 기준: **{high_record}초**",
+                    unsafe_allow_html=True,
+                )
+
+                # 기록 분석 코멘트
+                if my_best_record <= top_record:
+                    st.success(
+                        "🌟 대단합니다! 현재 최상위권 기록을 달성하고 있거나"
+                        " 뛰어넘었습니다!"
+                    )
+                elif my_best_record <= high_record:
+                    st.info(
+                        "👍 상위권 수준의 훌륭한 기록입니다! 조금만 더 노력하면"
+                        " 최상위권 도약이 가능합니다."
+                    )
+                else:
+                    st.warning(
+                        "💪 꾸준한 훈련을 통해 상위권 기록 진입을 목표로"
+                        " 화이팅해 봅시다!"
+                    )
+
+            if is_admin:
+                st.write("---")
+                if st.button(f"🗑️ [{view_member}] 선수의 전체 기록 초기화"):
+                    del st.session_state.lap_records[view_member]
+                    st.success(
+                        f"[{view_member}] 선수의 모든 기록이 삭제되었습니다."
+                    )
+                    st.rerun()
         else:
             st.info("💡 아직 저장된 랩타임 기록이 없습니다.")
 
-    with tab_lap2:
-        st.subheader("📈 클럽 벤치마크 기준표")
-        st.write("연령대 및 학년별 권장 기준 기록입니다.")
+    # [탭 3] 벤치마크 기준 관리 (관리자용 또는 조회용)
+    with tab_lap3:
+        st.subheader("📈 클럽 벤치마크 (기준 기록) 현황")
+        st.write(
+            "클럽에서 설정한 종목별 최상위권 및 상위권 기준 기록 데이터입니다."
+        )
 
-        # 벤치마크 기본 데이터 예시 출력
-        bm_data = {
-            "종목": ["100m", "300m", "500m", "1,000m"],
-            "초등 저학년": ["18.5초", "55.0초", "1분 35초", "3분 20초"],
-            "초등 고학년": ["15.2초", "48.1초", "1분 20초", "2분 50초"],
-            "중고등부": ["13.0초", "42.0초", "1분 10초", "2분 30초"],
-        }
-        st.dataframe(pd.DataFrame(bm_data), use_container_width=True)
+        bm_df = pd.DataFrame([
+            {
+                "종목": k,
+                "최상위권(초)": v["최상위권"],
+                "상위권(초)": v["상위권"],
+            }
+            for k, v in st.session_state.benchmark_db.items()
+        ])
+        st.dataframe(bm_df, use_container_width=True)
+
+        if is_admin:
+            st.write("---")
+            st.markdown("#### ➕ 벤치마크 기준 수정/등록 (관리자 전용)")
+            with st.form("bm_edit_form"):
+                b_col1, b_col2, b_col3 = st.columns(3)
+                with b_col1:
+                    b_ev = st.selectbox(
+                        "종목",
+                        ["100m", "200m", "300m", "500m", "1,000m", "1,500m"],
+                    )
+                with b_col2:
+                    b_top = st.number_input(
+                        "최상위권 기준 (초)", value=13.5, format="%.1f"
+                    )
+                with b_col3:
+                    b_high = st.number_input(
+                        "상위권 기준 (초)", value=15.0, format="%.1f"
+                    )
+
+                btn_bm_save = st.form_submit_button(
+                    "기준 기록 업데이트", use_container_width=True
+                )
+                if btn_bm_save:
+                    st.session_state.benchmark_db[b_ev] = {
+                        "최상위권": b_top,
+                        "상위권": b_high,
+                    }
+                    st.success(
+                        f"✅ [{b_ev}] 벤치마크 기준이 성공적으로 업데이트되었습니다!"
+                    )
+                    st.rerun()
 
 
 # --- 메뉴 2: 대회 정보 및 입상자 ---
@@ -262,7 +380,6 @@ elif main_menu == "2. 🏆 대회 정보 및 입상자":
                 )
                 st.success("사진이 성공적으로 업로드되었습니다!")
 
-        # 갤러리 출력
         photos = st.session_state.event_photos.get(selected_event, [])
         if photos:
             st.write("---")
@@ -547,7 +664,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     approved_users = [
         uid
         for uid, udata in st.session_state.users.items()
-        if udata.get("role") != "admin" and udata.get("status") == "approved"
+        if udata.get("role"] != "admin" and udata.get("status") == "approved"
     ]
 
     if approved_users:
