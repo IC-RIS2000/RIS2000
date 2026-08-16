@@ -85,7 +85,38 @@ if st.session_state.logged_in_user is None:
             new_pw = st.text_input("비밀번호", type="password")
             new_name = st.text_input("이름")
             new_gender = st.selectbox("성별", ["남", "여"])
-            new_grade = st.text_input("학년/부서 (예: 초등 3학년)")
+
+            # 출생년도 선택 (2006년 기준 현재 나이에 맞춰 자동 계산)
+            current_year = datetime.now().year
+            birth_years = list(range(current_year - 25, current_year - 3, 1))
+            selected_birth_year = st.selectbox(
+                "출생년도", birth_years, index=len(birth_years) - 10
+            )
+
+            # 출생년도에 따른 자동 학년 계산 로직 (2026년 기준)
+            age_diff = current_year - selected_birth_year
+            # 한국 나이 또는 학년 기준 (초등학교 입학 나이 만 7세, 즉 2026년 기준 2019년생=초1)
+            # 2026년 - 출생년도 - 6 = 초등학교 학년 (대략적인 계산)
+            school_grade_num = age_diff - 6
+            if school_grade_num == 1:
+                auto_grade = "초등 1학년"
+            elif school_grade_num == 2:
+                auto_grade = "초등 2학년"
+            elif school_grade_num == 3:
+                auto_grade = "초등 3학년"
+            elif school_grade_num == 4:
+                auto_grade = "초등 4학년"
+            elif school_grade_num == 5:
+                auto_grade = "초등 5학년"
+            elif school_grade_num == 6:
+                auto_grade = "초등 6학년"
+            elif school_grade_num > 6:
+                auto_grade = "중/고등부 또는 성인"
+            else:
+                auto_grade = "미취학 아동"
+
+            st.info(f"📚 자동 지정 학년: **{auto_grade}**")
+
             new_phone = st.text_input("연락처 (예: 010-1234-5678)")
             btn_signup = st.form_submit_button("가입 신청", use_container_width=True)
 
@@ -101,7 +132,7 @@ if st.session_state.logged_in_user is None:
                         "role": "member",
                         "status": "pending",
                         "gender": new_gender,
-                        "grade": new_grade,
+                        "grade": auto_grade,
                         "phone": new_phone,
                         "pay_status": "미납",
                     }
@@ -272,7 +303,6 @@ if main_menu == "1. 📊 랩타임 및 기록실":
 
                 st.write("")
                 st.markdown(f"#### 📈 [{comp_event}] 기록 변화 추이 (꺾은선형)")
-                # 날짜별 꺾은선 그래프 출력을 위해 인덱스를 날짜로 설정
                 chart_df = sub_df.set_index("날짜")[["기록(초)"]]
                 st.line_chart(chart_df)
 
