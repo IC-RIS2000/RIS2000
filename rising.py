@@ -159,21 +159,19 @@ if st.session_state.get("show_register", False):
         reg_phone = st.text_input("연락처", placeholder="숫자만 입력 (예: 01012345678)")
         reg_gender = st.selectbox("성별", ["남", "여"])
         
-        # 출생 연도 선택 (기본값 설정)
-        birth_years = list(range(2010, 2023))[::-1]
-        reg_birth = st.selectbox("출생 연도", birth_years)
+        # 출생 연도 선택 (기본 포맷 유지)
+        reg_birth = st.selectbox("출생 연도", list(range(2010, 2023))[::-1])
         
-        # 출생 연도에 따른 학년 자동 계산 로직 (2026년 기준)
-        # 2020년생: 유치부, 2019년생: 초등 1, 2018년생: 초등 2, ... 2014년생: 초등 6
+        # 2026년 기준 출생 연도별 자동 학년 계산 로직
         grade_options = ["유치부", "초등 1학년", "초등 2학년", "초등 3학년", "초등 4학년", "초등 5학년", "초등 6학년"]
         age_diff = 2026 - reg_birth
-        calculated_grade_index = 0
-        if age_diff >= 7: # 2019년생 이상 (초등학생)
-            calculated_grade_index = min(max(age_diff - 6, 1), 6)
-        else: # 2020년생 이하
-            calculated_grade_index = 0
+        calc_idx = 0
+        if age_diff >= 7:
+            calc_idx = min(max(age_diff - 6, 1), 6)
+        else:
+            calc_idx = 0
             
-        reg_grade = st.selectbox("학년 구분 (자동 계산)", grade_options, index=calculated_grade_index)
+        reg_grade = st.selectbox("학년 구분 (자동 계산)", grade_options, index=calc_idx)
         
         btn_submit_reg = st.form_submit_button("회원가입 신청", use_container_width=True)
         btn_cancel_reg = st.form_submit_button("취소", use_container_width=True)
@@ -231,13 +229,13 @@ elif st.session_state.get("show_profile_edit", False):
         
         grade_options = ["유치부", "초등 1학년", "초등 2학년", "초등 3학년", "초등 4학년", "초등 5학년", "초등 6학년"]
         age_diff = 2026 - edit_birth
-        calculated_grade_index = 0
+        calc_idx = 0
         if age_diff >= 7:
-            calculated_grade_index = min(max(age_diff - 6, 1), 6)
+            calc_idx = min(max(age_diff - 6, 1), 6)
         else:
-            calculated_grade_index = 0
+            calc_idx = 0
             
-        calc_grade = st.selectbox("학년 구분 (자동 계산)", grade_options, index=calculated_grade_index)
+        calc_grade = st.selectbox("학년 구분 (자동 계산)", grade_options, index=calc_idx)
         
         btn_save_profile = st.form_submit_button("정보 저장", use_container_width=True)
         btn_cancel_profile = st.form_submit_button("취소", use_container_width=True)
@@ -313,10 +311,13 @@ else:
         st.rerun()
 
 st.sidebar.write("---")
-main_menu = st.sidebar.radio(
-    "메뉴 선택",
-    ["1. 기록 측정 및 랭킹", "2. 대회 사진첩", "3. 건의사항", "4. 👥 회원 승인 및 관리 (관리자 전용)"]
-)
+
+# 관리자 여부에 따라 메뉴 구성 동적 분기 처리 (관리자 메뉴는 오직 관리자에게만 노출)
+menu_options = ["1. 기록 측정 및 랭킹", "2. 대회 사진첩", "3. 건의사항"]
+if is_admin:
+    menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
+
+main_menu = st.sidebar.radio("메뉴 선택", menu_options)
 
 selected_event = None
 if main_menu == "2. 대회 사진첩":
@@ -718,7 +719,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.write("---")
     
     st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status") == "approved"]
+    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status"] == "approved")
     
     if approved_users:
         with st.form("pay_manage_form"):
@@ -765,7 +766,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
                 st.session_state.lab_records = st.session_state.lab_records[st.session_state.lab_records["ID"] != selected_del_user].reset_index(drop=True)
                 save_records()
             
-            st.success(f"🗑️ [{del_name}] 회원의 계정 및 관련 데이터가 영구 저장 파일에서 영구 삭제되었습니다.")
+            st.success(f"🗑️ [{del_name}] 회원의 계정 및 관련 데이터가 영구 삭제되었습니다.")
             st.rerun()
     else:
         st.info("삭제할 수 있는 일반 회원이 없습니다.")
