@@ -171,9 +171,7 @@ if main_menu == "1. 📊 랩타임 및 기록실":
             with r_col1:
                 sel_member = st.selectbox("선수 선택", approved_members)
             with r_col2:
-                sel_date = st.date_input(
-                    "측정 일자", value=datetime.today()
-                )
+                sel_date = st.date_input("측정 일자", value=datetime.today())
             with r_col3:
                 sel_distance = st.selectbox(
                     "측정 종목",
@@ -227,19 +225,15 @@ if main_menu == "1. 📊 랩타임 및 기록실":
             st.write("---")
             st.markdown("### 🔍 최상위권 / 상위권 기록 비교")
 
-            # 종목별 비교 선택
             unique_events_in_rec = df_member["종목"].unique().tolist()
             comp_event = st.selectbox(
                 "비교할 종목을 선택하세요:", unique_events_in_rec
             )
 
-            # 해당 종목의 최신(또는 최고) 기록 가져오기
             sub_df = df_member[df_member["종목"] == comp_event]
             if not sub_df.empty:
-                my_latest_record = sub_df.iloc[-1][
-                    "기록(초)"
-                ]  # 가장 최근 기록 기준 예시
-                my_best_record = sub_df["기록(초)"].min()  # 개인 최고 기록
+                my_latest_record = sub_df.iloc[-1]["기록(초)"]
+                my_best_record = sub_df["기록(초)"].min()
 
                 col_c1, col_c2, col_c3 = st.columns(3)
                 col_c1.metric(
@@ -249,7 +243,6 @@ if main_menu == "1. 📊 랩타임 및 기록실":
                     label="내 개인 최고 기록(PB)", value=f"{my_best_record} 초"
                 )
 
-                # 벤치마크 기준 비교
                 bm_info = st.session_state.benchmark_db.get(comp_event, {})
                 top_record = bm_info.get("최상위권", 0)
                 high_record = bm_info.get("상위권", 0)
@@ -261,7 +254,6 @@ if main_menu == "1. 📊 랩타임 및 기록실":
                     unsafe_allow_html=True,
                 )
 
-                # 기록 분석 코멘트
                 if my_best_record <= top_record:
                     st.success(
                         "🌟 대단합니다! 현재 최상위권 기록을 달성하고 있거나"
@@ -289,7 +281,7 @@ if main_menu == "1. 📊 랩타임 및 기록실":
         else:
             st.info("💡 아직 저장된 랩타임 기록이 없습니다.")
 
-    # [탭 3] 벤치마크 기준 관리 (관리자용 또는 조회용)
+    # [탭 3] 벤치마크 기준 관리
     with tab_lap3:
         st.subheader("📈 클럽 벤치마크 (기준 기록) 현황")
         st.write(
@@ -664,7 +656,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     approved_users = [
         uid
         for uid, udata in st.session_state.users.items()
-        if udata.get("role"] != "admin" and udata.get("status") == "approved"
+        if udata.get("role") != "admin" and udata.get("status") == "approved"
     ]
 
     if approved_users:
