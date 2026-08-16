@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import re
 import os
 import json
@@ -159,10 +160,8 @@ if st.session_state.get("show_register", False):
         reg_phone = st.text_input("연락처", placeholder="숫자만 입력 (예: 01012345678)")
         reg_gender = st.selectbox("성별", ["남", "여"])
         
-        # 출생 연도 선택 (기본 포맷 유지)
         reg_birth = st.selectbox("출생 연도", list(range(2010, 2023))[::-1])
         
-        # 2026년 기준 출생 연도별 자동 학년 계산 로직
         grade_options = ["유치부", "초등 1학년", "초등 2학년", "초등 3학년", "초등 4학년", "초등 5학년", "초등 6학년"]
         age_diff = 2026 - reg_birth
         calc_idx = 0
@@ -312,7 +311,6 @@ else:
 
 st.sidebar.write("---")
 
-# 관리자 여부에 따라 메뉴 구성 동적 분기 처리 (관리자 메뉴는 오직 관리자에게만 노출)
 menu_options = ["1. 기록 측정 및 랭킹", "2. 대회 사진첩", "3. 건의사항"]
 if is_admin:
     menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
@@ -335,7 +333,7 @@ if main_menu == "1. 기록 측정 및 랭킹":
     st.write("우리 클럽 선수들의 종목별 기록을 측정하고 전국 기준 데이터와 비교해 보세요!")
     st.write("---")
     
-    created_tabs = st.tabs(["⏱️ 개인 기록 측정", "📊 전체 랭킹 조회", "📚 기준 기록표"])
+    created_tabs = st.tabs(["⏱️ 개인 기록 측정", "📊 전체 랭킹 조회", "📈 내 기록 vs 전국 기준 비교"])
     
     with created_tabs[0]:
         st.markdown("### 🚀 실시간 랩타임 기록 입력")
@@ -408,27 +406,38 @@ if main_menu == "1. 기록 측정 및 랭킹":
             st.info("등록된 기록 데이터가 존재하지 않습니다.")
 
     with created_tabs[2]:
-        st.markdown("### 📚 전국 유치부 및 초등학생 최상위권/상위권 기준 기록표")
-        custom_table_css = """
-<style>
-.compact-table-container { width: 100%; overflow-x: auto; margin-top: 10px; }
-.compact-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; }
-.compact-table th { background-color: #f1f3f5; color: #1c1e21; font-weight: bold; padding: 6px 8px; border: 1px solid #dee2e6; white-space: nowrap; }
-.compact-table td { padding: 4px 8px; border: 1px solid #dee2e6; color: #333333; }
-.compact-table tr:nth-child(even) { background-color: #f8f9fa; }
-.compact-table tr:hover { background-color: #e9ecef; }
-.highlight-top { color: #d62728; font-weight: 600; }
-.highlight-avg { color: #d97706; font-weight: 600; }
-</style>
-"""
-        table_html = custom_table_css + '<div class="compact-table-container"><table class="compact-table">'
-        table_html += '<thead><tr><th>학년</th><th>성별</th><th>종목</th><th>최상위권 (초)</th><th>상위권평균 (초)</th></tr></thead><tbody>'
-        
-        for _, row in benchmark_df.iterrows():
-            table_html += f"<tr><td><b>{row['학년']}</b></td><td>{row['성별']}</td><td>{row['종목']}</td><td class=\"highlight-top\">{row['최상위권']:.2f} 초</td><td class=\"highlight-avg\">{row['상위권평균']:.2f} 초</td></tr>"
-            
-        table_html += '</tbody></table></div>'
-        st.markdown(table_html, unsafe_allow_html=True)
+        st.markdown("### 📈 내 기록 vs 전국 기준 비교 차트")
+        if not st.session_state.logged_in_user:
+            st.warning("🔒 로그인 후 본인 기록과 전국 기준을 비교할 수 있습니다.")
+        else:
+            user_records = st.session_state.lab_records[st.session_state.lab_records["ID"] == current_id]
+            if user_records.empty:
+                st.info("💡 아직 측정된 본인 기록이 없습니다. '개인 기록 측정' 탭에서 먼저 기록을 남겨보세요!")
+            else:
+                user_grade = st.session_state.users[current_id].get("grade", "초등 1학년")
+                user_gender_raw = st.session_state.users[current_id].get("gender", "남")
+                b_gender = "남" if user_gender_raw == "남" else "여"
+                
+                match_bench = benchmark_df[(benchmark_df["학년"] == user_grade) & (benchmark_df["성별"].str.contains(b_gender))]
+                
+                if not match_bench.empty:
+                    st.markdown(f"**[{user_grade} / {user_gender_raw}]** 전국 상위권 기준과 내 최고 기록 비교")
+                    
+                    best_records = user_records.groupby("종목")["기록"].min().reset_index()
+                    merged_comp = pd.merge(match_bench, best_records, on="종목", how="inner")
+                    
+                    if not merged_comp.empty:
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(name='최상위권', x=merged_comp['종목'], y=merged_comp['최상위권'], marker_color='rgb(255, 99, 132)'))
+                        fig.add_trace(go.Bar(name='상위권 평균', x=merged_comp['종목'], y=merged_comp['상위권평균'], marker_color='rgb(54, 162, 235)'))
+                        fig.add_trace(go.Bar(name='내 최고 기록', x=merged_comp['종목'], y=merged_comp['기록'], marker_color='rgb(75, 192, 192)'))
+                        
+                        fig.update_layout(barmode='group', title_text="종목별 전국 기준 vs 내 기록 (낮을수록 우수)", yaxis_title="기록 (초)")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("비교할 종목의 기록 데이터가 일치하지 않습니다.")
+                else:
+                    st.info("해당 학년에 맞는 전국 기준 데이터가 없습니다.")
 
 elif main_menu == "2. 대회 사진첩":
     st.title("📸 대회 사진첩 및 입상자 명단")
@@ -719,7 +728,7 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.write("---")
     
     st.markdown("### 💳 2. 회원별 학원비 납부 상태 관리 (관리자 전용)")
-    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status") == "approved"]
+    approved_users = [uid for uid, udata in st.session_state.users.items() if udata.get("role") != "admin" and udata.get("status"] == "approved")
     
     if approved_users:
         with st.form("pay_manage_form"):
