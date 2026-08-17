@@ -29,14 +29,28 @@ if "logged_in_user" not in st.session_state:
   st.session_state.logged_in_user = None
 
 if "benchmark_db" not in st.session_state:
-  # 예시 벤치마크 (최상위권 / 상위권 기준 기록 - 초 단위)
+  # 학년별·종목별 세부 벤치마크 기준 기록 (예시)
   st.session_state.benchmark_db = {
-      "100m": {"최상위권": 13.5, "상위권": 15.0},
-      "200m": {"최상위권": 26.0, "상위권": 29.0},
-      "300m": {"최상위권": 38.5, "상위권": 43.0},
-      "500m": {"최상위권": 52.0, "상위권": 58.0},
-      "1,000m": {"최상위권": 115.0, "상위권": 130.0},
-      "1,500m": {"최상위권": 180.0, "상위권": 200.0},
+      "초등 저학년부": {
+          "100m": {"최상위권": 14.0, "상위권": 16.0},
+          "200m": {"최상위권": 28.0, "상위권": 31.0},
+          "300m": {"최상위권": 41.0, "상위권": 46.0},
+          "500m": {"최상위권": 55.0, "상위권": 62.0},
+      },
+      "초등 고학년부": {
+          "100m": {"최상위권": 13.0, "상위권": 14.5},
+          "200m": {"최상위권": 25.0, "상위권": 28.0},
+          "300m": {"최상위권": 37.0, "상위권": 41.0},
+          "500m": {"최상위권": 50.0, "상위권": 56.0},
+          "1,000m": {"최상위권": 110.0, "상위권": 125.0},
+      },
+      "중/고등부 또는 성인": {
+          "100m": {"최상위권": 12.0, "상위권": 13.5},
+          "300m": {"최상위권": 34.0, "상위권": 38.0},
+          "500m": {"최상위권": 47.0, "상위권": 52.0},
+          "1,000m": {"최상위권": 102.0, "상위권": 115.0},
+          "1,500m": {"최상위권": 170.0, "상위권": 190.0},
+      },
   }
 
 if "lap_records" not in st.session_state:
@@ -100,24 +114,16 @@ if st.session_state.logged_in_user is None:
 
       age_diff = current_year - selected_birth_year
       school_grade_num = age_diff - 6
-      if school_grade_num == 1:
-        auto_grade = "초등 1학년"
-      elif school_grade_num == 2:
-        auto_grade = "초등 2학년"
-      elif school_grade_num == 3:
-        auto_grade = "초등 3학년"
-      elif school_grade_num == 4:
-        auto_grade = "초등 4학년"
-      elif school_grade_num == 5:
-        auto_grade = "초등 5학년"
-      elif school_grade_num == 6:
-        auto_grade = "초등 6학년"
+      if 1 <= school_grade_num <= 3:
+        auto_grade = "초등 저학년부"
+      elif 4 <= school_grade_num <= 6:
+        auto_grade = "초등 고학년부"
       elif school_grade_num > 6:
         auto_grade = "중/고등부 또는 성인"
       else:
-        auto_grade = "미취학 아동"
+        auto_grade = "초등 저학년부"
 
-      st.info(f"📚 자동 지정 학년: **{auto_grade}**")
+      st.info(f"📚 자동 지정 분류: **{auto_grade}**")
       new_phone = st.text_input("연락처 (예: 010-1234-5678)")
       btn_signup = st.form_submit_button("가입 신청", use_container_width=True)
 
@@ -176,8 +182,9 @@ is_admin = (
 if main_menu == "1. 📊 랩타임 및 기록실":
   st.title("📊 랩타임 측정 및 개인별 비교 기록실")
   st.write(
-      "날짜별 랩타임 측정 데이터를 기록하고, 개인별 성장 추이 조회 및 전국"
-      " 최상위·상위권 기준 기록과 비교할 수 있습니다."
+      "학생 이름을 선택하면 해당 학생의 학년 정보가 자동으로 연동되며, 학년별"
+      " 최상위·상위권 선수 기준과 비교 및 성장 추이 그래프를 확인할 수"
+      " 있습니다."
   )
   st.write("---")
 
@@ -193,7 +200,7 @@ if main_menu == "1. 📊 랩타임 및 기록실":
     approved_members = [
         udata["name"]
         for uid, udata in st.session_state.users.items()
-        if udata.get("status") == "approved"
+        if udata.get("status") == "approved" and udata.get("role") != "admin"
     ]
     if not approved_members:
       approved_members = ["등록된 회원 없음"]
@@ -236,13 +243,26 @@ if main_menu == "1. 📊 랩타임 및 기록실":
               "⚠️ 올바른 선수 이름과 0보다 큰 기록(초)을 입력해 주세요."
           )
 
-  # [탭 2] 개인별 기록 조회 및 최상위/상위권 비교
+  # [탭 2] 개인별 기록 조회 및 최상위/상위권 비교 (복원된 핵심 기능)
   with tab_lap2:
-    st.subheader("👤 개인별 기록 조회 및 상위권 비교 분석")
+    st.subheader("👤 개인별 기록 조회 및 학년별 상위권 비교")
 
     if st.session_state.lap_records:
       all_recorded_members = list(st.session_state.lap_records.keys())
-      view_member = st.selectbox("조회할 선수를 선택하세요:", all_recorded_members)
+      view_member = st.selectbox(
+          "조회할 학생(선수)을 선택하세요:", all_recorded_members
+      )
+
+      # 선택한 학생의 학년 정보 찾아내기
+      member_grade = "초등 고학년부"  # 기본값
+      for uid, udata in st.session_state.users.items():
+        if udata.get("name") == view_member:
+          member_grade = udata.get("grade", "초등 고학년부")
+          break
+
+      st.info(
+          f"ℹ️ **[{view_member}]** 선수의 소속 그룹(학년): **{member_grade}**"
+      )
 
       member_data = st.session_state.lap_records[view_member]
       df_member = pd.DataFrame(member_data)
@@ -251,11 +271,13 @@ if main_menu == "1. 📊 랩타임 및 기록실":
       st.dataframe(df_member, use_container_width=True)
 
       st.write("---")
-      st.markdown("### 🔍 최상위권 / 상위권 기록 비교 및 추이 그래프")
+      st.markdown(
+          f"### 🔍 [{member_grade}] 최상위권·상위권 기준 비교 및 추이 그래프"
+      )
 
       unique_events_in_rec = df_member["종목"].unique().tolist()
       comp_event = st.selectbox(
-          "비교할 종목을 선택하세요:", unique_events_in_rec
+          "비교 및 그래프로 확인할 종목:", unique_events_in_rec
       )
 
       sub_df = df_member[df_member["종목"] == comp_event].copy()
@@ -267,34 +289,40 @@ if main_menu == "1. 📊 랩타임 및 기록실":
         col_c1.metric(label="내 최근 기록", value=f"{my_latest_record} 초")
         col_c2.metric(label="내 개인 최고 기록(PB)", value=f"{my_best_record} 초")
 
-        bm_info = st.session_state.benchmark_db.get(comp_event, {})
-        top_record = bm_info.get("최상위권", 0)
-        high_record = bm_info.get("상위권", 0)
+        # 해당 학년 그룹의 벤치마크 기준 가져오기
+        grade_bm = st.session_state.benchmark_db.get(member_grade, {})
+        event_bm = grade_bm.get(comp_event, {"최상위권": 0, "상위권": 0})
+        top_record = event_bm.get("최상위권", 0)
+        high_record = event_bm.get("상위권", 0)
 
         col_c3.markdown(
-            f"**🏆 기준 비교 ({comp_event})**<br>"
-            f"- 전국 최상위권 기준: **{top_record}초**<br>"
-            f"- 상위권 기준: **{high_record}초**",
+            f"**🏆 [{member_grade}] {comp_event} 기준**<br>"
+            f"- 최상위권: **{top_record}초**<br>"
+            f"- 상위권: **{high_record}초**",
             unsafe_allow_html=True,
         )
 
-        if my_best_record <= top_record:
-          st.success(
-              "🌟 대단합니다! 현재 전국 최상위권 기록을 달성하고 있거나"
-              " 뛰어넘었습니다!"
-          )
-        elif my_best_record <= high_record:
-          st.info(
-              "👍 상위권 수준의 훌륭한 기록입니다! 조금만 더 노력하면 최상위권"
-              " 도약이 가능합니다."
-          )
+        if top_record > 0:
+          if my_best_record <= top_record:
+            st.success(
+                "🌟 대단합니다! 해당 학년 전국 최상위권 기록을 달성했습니다!"
+            )
+          elif my_best_record <= high_record:
+            st.info(
+                "👍 해당 학년 상위권 수준의 훌륭한 기록입니다! 최상위권 도약을"
+                " 향해 화이팅!"
+            )
+          else:
+            st.warning(
+                "💪 꾸준한 훈련을 통해 상위권 기록 진입을 목표로 도전해 봅시다!"
+            )
         else:
-          st.warning(
-              "💪 꾸준한 훈련을 통해 상위권 기록 진입을 목표로 화이팅해 봅시다!"
+          st.info(
+              "💡 해당 종목의 학년별 벤치마크 기준이 아직 설정되지 않았습니다."
           )
 
         st.write("")
-        st.markdown(f"#### 📈 [{comp_event}] 기록 변화 추이 (꺾은선형)")
+        st.markdown(f"#### 📈 [{view_member}] 선수의 [{comp_event}] 기록 추이")
         chart_df = sub_df.set_index("날짜")[["기록(초)"]]
         st.line_chart(chart_df)
 
@@ -309,43 +337,53 @@ if main_menu == "1. 📊 랩타임 및 기록실":
 
   # [탭 3] 벤치마크 기준 관리
   with tab_lap3:
-    st.subheader("📈 클럽 벤치마크 (기준 기록) 현황")
-    st.write(
-        "클럽에서 설정한 종목별 최상위권 및 상위권 기준 기록 데이터입니다."
-    )
+    st.subheader("📈 학년별·종목별 벤치마크 기준 관리")
+    st.write("학년 그룹별 종목별 최상위권 및 상위권 기준 기록입니다.")
 
-    bm_df = pd.DataFrame([
-        {"종목": k, "최상위권(초)": v["최상위권"], "상위권(초)": v["상위권"]}
-        for k, v in st.session_state.benchmark_db.items()
-    ])
-    st.dataframe(bm_df, use_container_width=True)
+    bm_list = []
+    for grp, evs in st.session_state.benchmark_db.items():
+      for ev, vals in evs.items():
+        bm_list.append({
+            "그룹/학년": grp,
+            "종목": ev,
+            "최상위권(초)": vals["최상위권"],
+            "상위권(초)": vals["상위권"],
+        })
+    st.dataframe(pd.DataFrame(bm_list), use_container_width=True)
 
     if is_admin:
       st.write("---")
       st.markdown("#### ➕ 벤치마크 기준 수정/등록 (관리자 전용)")
       with st.form("bm_edit_form"):
-        b_col1, b_col2, b_col3 = st.columns(3)
+        b_col1, b_col2, b_col3, b_col4 = st.columns(4)
         with b_col1:
+          b_grp = st.selectbox(
+              "그룹/학년",
+              ["초등 저학년부", "초등 고학년부", "중/고등부 또는 성인"],
+          )
+        with b_col2:
           b_ev = st.selectbox(
               "종목", ["100m", "200m", "300m", "500m", "1,000m", "1,500m"]
           )
-        with b_col2:
+        with b_col3:
           b_top = st.number_input(
               "최상위권 기준 (초)", value=13.5, format="%.1f"
           )
-        with b_col3:
+        with b_col4:
           b_high = st.number_input("상위권 기준 (초)", value=15.0, format="%.1f")
 
         btn_bm_save = st.form_submit_button(
             "기준 기록 업데이트", use_container_width=True
         )
         if btn_bm_save:
-          st.session_state.benchmark_db[b_ev] = {
+          if b_grp not in st.session_state.benchmark_db:
+            st.session_state.benchmark_db[b_grp] = {}
+          st.session_state.benchmark_db[b_grp][b_ev] = {
               "최상위권": b_top,
               "상위권": b_high,
           }
           st.success(
-              f"✅ [{b_ev}] 벤치마크 기준이 성공적으로 업데이트되었습니다!"
+              f"✅ [{b_grp}] [{b_ev}] 벤치마크 기준이 업데이트되었습니다!"
           )
           st.rerun()
 
