@@ -174,9 +174,12 @@ if st.session_state.logged_in_user is None:
 else:
   current_id = st.session_state.logged_in_user
   current_user = st.session_state.users.get(current_id, {})
+
+  # 3항 연산자를 f-string 밖으로 분리하여 SyntaxError 해결
+  role_str = "관리자" if current_user.get("role") == "admin" else "회원"
+
   st.sidebar.markdown(
-      f"👤 **{current_user.get('name')}**님 환영합니다! ({'관리자' if"
-      f" current_user.get('role') == 'admin' else '회원'})"
+      f"👤 **{current_user.get('name')}**님 환영합니다! ({role_str})"
   )
   if st.sidebar.button("로그아웃", use_container_width=True):
     st.session_state.logged_in_user = None
@@ -375,7 +378,7 @@ if main_menu == "1. 📊 랩타임 및 기록실":
               annotation_position="bottom right",
           )
 
-        # 레이아웃 고정 (스크롤바 및 커서 생김새 방지, 한 페이지에 꽉 차게 고정)
+        # 레이아웃 고정 (스크롤바 및 커서 방지, 한 페이지에 꽉 차게 고정)
         fig.update_layout(
             xaxis=dict(type="category"),  # 날짜를 고정 간격 카테고리로 처리
             margin=dict(l=40, r=40, t=40, b=40),
