@@ -213,7 +213,7 @@ if main_menu == "3. 대회 사진첩":
     
     if is_admin:
         with st.sidebar.expander("🛠️ 폴더 추가/삭제 관리"):
-            with st.form("add_folder_form", clear_on_submit=True):
+            with st.sidebar.form("add_folder_form", clear_on_submit=True):
                 new_folder_name = st.text_input("새 폴더 이름")
                 if st.form_submit_button("폴더 생성"):
                     if new_folder_name.strip() and new_folder_name.strip() not in st.session_state.event_folders:
@@ -399,7 +399,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                         st.success("저장 완료")
                         st.rerun()
         else:
-            st.markdown("#### 📷 수기 기록표 이미지 업로드 및 다중 기록 파싱")
+            st.markdown("### 📷 수기 기록표 이미지 업로드 및 다중 기록 파싱")
             uploaded_sheet = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png"])
             
             if uploaded_sheet:
@@ -637,7 +637,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
 
 elif main_menu == "2. 대회 참가 신청 및 명단":
     st.title("🏆 대회 참가 신청 및 희망 명단 대시보드")
-    st.write("대회명을 개설하고, 회원이 여러 참가 종목을 자유롭게 입력하여 신청하며, 실시간 참가자 명단 확인 및 엑셀 다운로드가 가능합니다.")
+    st.write("대회명을 개설하고, 회원이 여러 참가 종목을 숫자만 입력하여 신청하며, 실시간 참가자 명단 확인 및 엑셀 다운로드가 가능합니다.")
     st.write("---")
 
     if is_admin:
@@ -697,19 +697,24 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                         
                         if not already_applied:
                             with st.form(f"apply_form_{comp['id']}"):
-                                st.write("참가 종목을 최대 3개까지 각각 입력해주세요.")
-                                app_event1 = st.text_input("참가 종목 1", value="300m", placeholder="예: 300m")
-                                app_event2 = st.text_input("참가 종목 2", value="500m", placeholder="예: 500m")
-                                app_event3 = st.text_input("참가 종목 3", value="계주", placeholder="예: 계주")
+                                st.write("참가 종목 숫자를 입력해주세요. (예: 300, 500 등)")
+                                app_event1_raw = st.text_input("참가 종목 1 (숫자만)", value="300", placeholder="예: 300")
+                                app_event2_raw = st.text_input("참가 종목 2 (숫자만)", value="500", placeholder="예: 500")
+                                app_event3_raw = st.text_input("참가 종목 3 (선택, 숫자만)", value="", placeholder="예: 1000")
                                 
                                 if st.form_submit_button("🙋 참가 희망 신청하기", use_container_width=True):
+                                    # 숫자만 입력받아 뒤에 'm' 붙이기 (입력값이 있을 경우에만)
+                                    e1 = f"{app_event1_raw.strip()}m" if app_event1_raw.strip() else ""
+                                    e2 = f"{app_event2_raw.strip()}m" if app_event2_raw.strip() else ""
+                                    e3 = f"{app_event3_raw.strip()}m" if app_event3_raw.strip() else ""
+                                    
                                     new_applicant = {
                                         "id": st.session_state.logged_in_user,
                                         "name": user_data.get("name", "이름없음"),
                                         "grade": user_data.get("grade", "회원"),
-                                        "event1": app_event1.strip(),
-                                        "event2": app_event2.strip(),
-                                        "event3": app_event3.strip()
+                                        "event1": e1,
+                                        "event2": e2,
+                                        "event3": e3
                                     }
                                     comp["applicants"].append(new_applicant)
                                     save_competitions_to_disk()
@@ -727,7 +732,6 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                 st.markdown("#### 👥 실시간 대회 참가자 희망 명단")
                 applicants = comp.get("applicants", [])
                 if applicants:
-                    # 기존 데이터 호환성 처리 (단일 event 필드가 남아있는 경우 처리)
                     formatted_applicants = []
                     for app in applicants:
                         e1 = app.get("event1", "")
