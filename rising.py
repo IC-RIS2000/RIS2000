@@ -22,6 +22,7 @@ FOLDERS_FILE = os.path.join(DATA_DIR, "folders.json")
 WINNERS_FILE = os.path.join(DATA_DIR, "winners.json")
 SUGGESTIONS_FILE = os.path.join(DATA_DIR, "suggestions.json")
 NOTICE_FILE = os.path.join(DATA_DIR, "notice.json")
+COMPETITIONS_FILE = os.path.join(DATA_DIR, "competitions.json")
 
 def load_json(filepath, default_val):
     if os.path.exists(filepath):
@@ -107,6 +108,10 @@ if "club_notice" not in st.session_state:
 if "suggestions" not in st.session_state:
     st.session_state.suggestions = load_json(SUGGESTIONS_FILE, [])
 
+if "competitions" not in st.session_state:
+    # 구조: [{ "id": "...", "title": "...", "start_date": "...", "description": "...", "applicants": [{"id": "...", "name": "...", "grade": "...", "event": "..."}] }]
+    st.session_state.competitions = load_json(COMPETITIONS_FILE, [])
+
 default_users = {
     "admin": {
         "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
@@ -158,6 +163,9 @@ def save_suggestions_to_disk():
 def save_notice_to_disk():
     save_json(NOTICE_FILE, st.session_state.club_notice)
 
+def save_competitions_to_disk():
+    save_json(COMPETITIONS_FILE, st.session_state.competitions)
+
 def convert_record_to_seconds(record_str):
     try:
         s_val = str(record_str).strip()
@@ -179,9 +187,9 @@ if current_id and current_id in st.session_state.users:
 
 # 6. 사이드바 메인 메뉴
 st.sidebar.header("🏃 밴드 메뉴")
-menu_options = ["홈 (기본 영상)", "1. 개인별 LAB Time Recorder", "2. 대회 사진첩", "3. 건의사항"]
+menu_options = ["홈 (기본 영상)", "1. 개인별 LAB Time Recorder", "2. 대회 참가 신청 및 명단", "3. 대회 사진첩", "4. 건의사항"]
 if is_admin:
-    menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
+    menu_options.append("5. 👥 회원 승인 및 관리 (관리자 전용)")
 
 if current_id:
     menu_options.append("🔐 개인정보 변경")
@@ -189,7 +197,7 @@ if current_id:
 main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options)
 
 selected_event = None
-if main_menu == "2. 대회 사진첩":
+if main_menu == "3. 대회 사진첩":
     st.sidebar.markdown("---")
     st.sidebar.subheader("📂 대회 폴더 선택")
     if st.session_state.event_folders:
@@ -287,7 +295,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     if "측정 회차" not in st.session_state.lab_records.columns:
         st.session_state.lab_records["측정 회차"] = "1회차"
 
-    # 기록 데이터의 학년 및 성별을 실제 회원 정보와 실시간 동기화
     for idx, row in st.session_state.lab_records.iterrows():
         r_id = row.get("ID")
         r_name = str(row.get("이름")).strip()
@@ -595,13 +602,126 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         else:
             st.info("등록된 기록이 없습니다.")
 
-elif main_menu == "2. 대회 사진첩":
+elif main_menu == "2. 대회 참가 신청 및 명단":
+    st.title("🏆 대회 참가 신청 및 희망 명단 대시보드")
+    st.write("대회명을 개설하고, 회원이 대회 참가 희망 신청을 하며, 실시간 참가자 명단을 관리 및 삭제할 수 있습니다.")
+    st.write("---")
+
+    # 관리자 기능: 대회 개설 및 삭제
+    if is_admin:
+        with st.expander("🛠️ [관리자] 대회 개설 및 삭제 관리", expanded=False):
+            with st.form("create_competition_form"):
+                st.subheader("새로운 대회 개설하기")
+                new_comp_title = st.text_input("대회명 (예: 2026 전국 인라인 하키 및 스피드 대회)")
+                new_comp_date = st.date_input("대회 일자", datetime.now())
+                new_comp_desc = st.text_area("대회 안내 및 상세 내용")
+                
+                if st.form_submit_button("대회 개설하기"):
+                    if new_comp_title.strip():
+                        new_comp_item = {
+                            "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+                            "title": new_comp_title.strip(),
+                            "start_date": new_comp_date.strftime("%Y-%m-%d"),
+                            "description": new_comp_desc.strip(),
+                            "applicants": []
+                        }
+                        st.session_state.competitions.append(new_comp_item)
+                        save_competitions_to_disk()
+                        st.success(f"'{new_comp_title}' 대회가 성공적으로 개설되었습니다!")
+                        st.rerun()
+                    else:
+                        st.error("대회명을 입력해주세요.")
+            
+            if st.session_state.competitions:
+                st.markdown("---")
+                st.subheader("🗑️ 개설된 대회 삭제")
+                comp_titles_dict = {c["id"]: f"{c['title']} ({c['start_date']})" for c in st.session_state.competitions}
+                selected_comp_to_delete = st.selectbox("삭제할 대회를 선택하세요", list(comp_titles_dict.keys()), format_func=lambda x: comp_titles_dict[x])
+                if st.button("선택한 대회 삭제하기", type="primary"):
+                    st.session_state.competitions = [c for c in st.session_state.competitions if c["id"] != selected_comp_to_delete]
+                    save_competitions_to_disk()
+                    st.success("대회가 삭제되었습니다.")
+                    st.rerun()
+
+    st.markdown("---")
+    st.subheader("📋 대회 목록 및 실시간 참가자 희망 명단")
+
+    if not st.session_state.competitions:
+        st.info("현재 개설된 대회가 없습니다. 관리자 계정으로 대회를 개설해 주세요.")
+    else:
+        for idx, comp in enumerate(st.session_state.competitions):
+            with st.container(border=True):
+                col_info, col_action = st.columns([2, 1])
+                with col_info:
+                    st.markdown(f"### 🚩 {comp['title']}")
+                    st.markdown(f"**📅 대회 일자:** {comp['start_date']}")
+                    if comp.get('description'):
+                        st.markdown(f"**ℹ️ 안내:** {comp['description']}")
+                
+                with col_action:
+                    if st.session_state.logged_in_user:
+                        user_data = st.session_state.users[st.session_state.logged_in_user]
+                        already_applied = any(app["id"] == st.session_state.logged_in_user for app in comp["applicants"])
+                        
+                        if not already_applied:
+                            with st.form(f"apply_form_{comp['id']}"):
+                                app_event = st.text_input("참가 종목 (예: 300m, 계주 등)", value="300m")
+                                if st.form_submit_button("🙋 참가 희망 신청하기", use_container_width=True):
+                                    new_applicant = {
+                                        "id": st.session_state.logged_in_user,
+                                        "name": user_data.get("name", "이름없음"),
+                                        "grade": user_data.get("grade", "회원"),
+                                        "event": app_event.strip()
+                                    }
+                                    comp["applicants"].append(new_applicant)
+                                    save_competitions_to_disk()
+                                    st.success("참가 신청이 완료되었습니다!")
+                                    st.rerun()
+                        else:
+                            st.success("✅ 참가 신청 완료됨")
+                            if st.button("❌ 참가 신청 취소", key=f"cancel_apply_{comp['id']}", use_container_width=True):
+                                comp["applicants"] = [app for app in comp["applicants"] if app["id"] != st.session_state.logged_in_user]
+                                save_competitions_to_disk()
+                                st.rerun()
+                    else:
+                        st.info("로그인 후 참가 신청이 가능합니다.")
+
+                st.markdown("#### 👥 실시간 대회 참가자 희망 명단")
+                applicants = comp.get("applicants", [])
+                if applicants:
+                    app_df = pd.DataFrame(applicants)
+                    # 보기 좋게 컬럼명 매핑
+                    app_df = app_df.rename(columns={"name": "이름", "grade": "학년", "event": "참가 종목"})
+                    display_app_df = app_df[["이름", "학년", "참가 종목"]]
+                    
+                    st.dataframe(display_app_df, use_container_width=True)
+                    
+                    # 관리자 또는 본인이 신청한 항목에 대해 개별 삭제 가능 기능
+                    if is_admin or st.session_state.logged_in_user:
+                        with st.expander(f"⚙️ '{comp['title']}' 참가자 명단 개별 관리"):
+                            app_names_to_delete = st.selectbox(
+                                "삭제할 참가자 선택", 
+                                options=range(len(applicants)), 
+                                format_func=lambda i: f"{applicants[i]['name']} ({applicants[i]['grade']} / {applicants[i]['event']})",
+                                key=f"del_select_{comp['id']}"
+                            )
+                            target_app = applicants[app_names_to_delete]
+                            if is_admin or target_app["id"] == st.session_state.logged_in_user:
+                                if st.button("선택한 참가자 명단에서 삭제", key=f"del_btn_{comp['id']}_{app_names_to_delete}"):
+                                    comp["applicants"].pop(app_names_to_delete)
+                                    save_competitions_to_disk()
+                                    st.success("참가자 명단에서 삭제되었습니다.")
+                                    st.rerun()
+                else:
+                    st.write("아직 참가 희망을 등록한 선수가 없습니다.")
+
+elif main_menu == "3. 대회 사진첩":
     st.title("📸 대회 사진첩")
     if not st.session_state.logged_in_user:
         st.stop()
     st.info("사진첩 메뉴입니다.")
 
-elif main_menu == "3. 건의사항":
+elif main_menu == "4. 건의사항":
     st.title("💡 건의사항")
     with st.form("sug"):
         t = st.text_input("제목")
@@ -611,7 +731,7 @@ elif main_menu == "3. 건의사항":
             save_suggestions_to_disk()
             st.rerun()
 
-elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
+elif main_menu == "5. 👥 회원 승인 및 관리 (관리자 전용)":
     st.title("👥 회원 관리")
     if not is_admin: 
         st.stop()
