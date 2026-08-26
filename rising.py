@@ -236,15 +236,15 @@ if main_menu == "3. 대회 사진첩":
                     st.success("폴더가 삭제되었습니다.")
                     st.rerun()
 
-# 6-1. [추가] 사이드바 인라인 샵 및 기타 자료 링크 섹션
+# 6-1. 사이드바 레이싱 전문 샵 및 강습 동영상 링크 섹션 (수정됨)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔗 인라인 샵 & 기타 자료")
-with st.sidebar.expander("🛍️ 인라인 전문 샵 링크"):
-    st.markdown("- [프리웨이브 (장비전문)](http://free-wave.co.kr/)", unsafe_allow_html=True)
-    st.markdown("- [블레이더 (스케이트몰)](https://blader.co.kr/)", unsafe_allow_html=True)
-    st.markdown("- [킹카스포츠 (아동/성인)](https://www.kingkasports.co.kr/)", unsafe_allow_html=True)
+st.sidebar.subheader("🔗 인라인 레이싱 샵 & 동영상")
+with st.sidebar.expander("🏎️ 인라인 레이싱 전문 샵"):
+    st.markdown("- [프리웨이브 (레이싱 장비)](http://free-wave.co.kr/)", unsafe_allow_html=True)
+    st.markdown("- [블레이더 (스피드 레이싱)](https://blader.co.kr/)", unsafe_allow_html=True)
+    st.markdown("- [스피드인라인 레이싱몰](http://www.speedinline.co.kr/)", unsafe_allow_html=True)
 
-with st.sidebar.expander("🎥 인라인 강습 동영상"):
+with st.sidebar.expander("🎥 인라인 강습 및 주행 영상"):
     st.markdown("- [인라인 초급 과정 강좌보기](https://www.youtube.com/watch?v=l7cuAsNMtTE)", unsafe_allow_html=True)
     st.markdown("- [기초 턴 및 기술 연습보기](https://www.youtube.com/watch?v=nzpLqBZ-1lQ)", unsafe_allow_html=True)
 
