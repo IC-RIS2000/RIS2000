@@ -50,13 +50,13 @@ def play_main_video():
         
         video_base64 = base64.b64encode(video_bytes).decode()
         
-        # 화면 폭에 맞춰 꽉 차게 보이되, 세로가 너무 늘어나지 않도록 조정
-        col1, col2, col3 = st.columns([0.5, 3, 0.5])
+        # 세로형 영상이 화면에서 적당히 커 보이도록 높이와 중앙 정렬을 최적화합니다.
+        col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: center; width: 100%;">
-                    <video width="100%" controls style="max-height: 500px; object-fit: contain; border-radius: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px;">
+                    <video controls autoplay muted loop style="max-height: 580px; width: auto; max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                         <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
