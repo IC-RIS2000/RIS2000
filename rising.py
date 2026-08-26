@@ -11,10 +11,10 @@ import numpy as np
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
-# 2. 데이터 영구 저장을 위한 JSON 파일 경로 설정
+# 2. 데이터 영구 저장을 위한 JSON 파일 경로 설정 (exist_ok=True 추가하여 오류 방지)
 DATA_DIR = "club_data"
 if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+    os.makedirs(DATA_DIR, exist_ok=True)
 
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
@@ -40,7 +40,7 @@ def save_json(filepath, data):
 STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), "static")
 ASSETS_PATH = os.path.join(STREAMLIT_STATIC_PATH, "assets")
 if not os.path.exists(ASSETS_PATH):
-    os.makedirs(ASSETS_PATH)
+    os.makedirs(ASSETS_PATH, exist_ok=True)
 
 video_files = {
     "main": r"C:\Users\User\Downloads\band_video_2026_07_18_23_28_26.mp4",
@@ -130,7 +130,6 @@ if "users" not in st.session_state:
     if "admin" not in st.session_state.users:
         st.session_state.users["admin"] = default_users["admin"]
 
-# 기존 가입된 유저들의 학년도 출생연도 기준으로 강제 업데이트 (오류 방지)
 for uid, udata in st.session_state.users.items():
     if "birth_year" in udata and udata["birth_year"]:
         udata["grade"] = get_grade_by_birth_year(udata["birth_year"])
@@ -462,7 +461,6 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.title("👥 회원 관리")
     if not is_admin: st.stop()
     
-    # 관리자 화면에서 기존 가입된 유저들의 학년이 잘못되어 있다면 즉시 동기화해줌
     for uid, udata in st.session_state.users.items():
         if "birth_year" in udata and udata["birth_year"]:
             udata["grade"] = get_grade_by_birth_year(udata["birth_year"])
