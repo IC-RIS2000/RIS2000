@@ -50,20 +50,18 @@ def play_main_video():
         
         video_base64 = base64.b64encode(video_bytes).decode()
         
-        # 세로형 영상이 화면에서 적당히 커 보이도록 높이와 중앙 정렬을 최적화합니다.
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown(
-                f"""
-                <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px;">
-                    <video controls autoplay muted loop style="max-height: 580px; width: auto; max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                        <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        # 컬럼을 쓰지 않고 전체 폭에서 브라우저 세로 크기(vh)에 맞춰 꽉 차게 출력합니다.
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; height: 62vh; margin-top: 5px;">
+                <video controls autoplay muted loop style="height: 100%; max-height: 700px; width: auto; object-fit: contain; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     else:
         st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
