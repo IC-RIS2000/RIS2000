@@ -245,7 +245,18 @@ else:
 if main_menu == "홈 (기본 영상)":
     col_title, col_notice = st.columns([1, 1])
     with col_title:
-        st.title("🛼 Rising Inline Club")
+        st.markdown(
+            """
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 2.2rem;">🛼</span>
+                <h1 style="margin: 0; padding: 0; font-size: 2.5rem; color: white;">Rising Inline Club</h1>
+            </div>
+            <p style="margin-top: 8px; margin-left: 50px; font-size: 1.1rem; color: #b0b0b0;">
+                문의 : 박희영(H.P 010.6677.0633)
+            </p>
+            """,
+            unsafe_allow_html=True
+        )
     with col_notice:
         st.info(st.session_state.club_notice)
         if is_admin:
@@ -281,7 +292,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         r_id = row.get("ID")
         r_name = str(row.get("이름")).strip()
         
-        # ID로 먼저 매칭 시도, 없으면 이름으로 매칭
         matched_user = None
         if r_id in st.session_state.users:
             matched_user = st.session_state.users[r_id]
@@ -326,7 +336,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             with st.form("manual_rec_form", clear_on_submit=True):
                 r_date = st.date_input("날짜", datetime.now())
                 r_round = st.selectbox("측정 회차", ["1회차", "2회차", "3회차", "4회차", "5회차"])
-                # 선택된 회원의 성별을 회원 정보에서 자동 가져오기
                 auto_gender = st.session_state.users.get(selected_uid, {}).get("gender", "남자")
                 r_gender = st.selectbox("성별", ["남자", "여자"], index=0 if auto_gender == "남자" else 1)
                 r_event = st.selectbox("종목", ["100m", "300m", "500m", "1,000m"])
@@ -563,14 +572,12 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     else:
                         diff_str = "기준 동일 ✨"
                     
-                    # 요청하신 대로 하나의 열에 통합 포맷팅
                     combined_record_list.append(f"{raw_rec} / 최상위권 {top_val:.2f}초 ({diff_str})")
                 else:
                     combined_record_list.append(f"{raw_rec} / 기준 없음 ➖")
             
             merged_view_df["기록 (최상위권 비교)"] = combined_record_list
             
-            # 독립된 최상위권 및 차이 컬럼을 없애고 통합된 기록 컬럼으로 대체
             display_cols_order = ["입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록 (최상위권 비교)"]
             final_show_df = merged_view_df[[c for c in display_cols_order if c in merged_view_df.columns]]
             
