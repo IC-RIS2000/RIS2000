@@ -366,7 +366,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 
                 sheet_date = st.date_input("📅 측정 날짜", datetime.now())
                 
-                # 드롭다운(탑다운) 설정을 적용한 data_editor
                 grade_list_options = ["미등록회원", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
                 event_list_options = ["100m", "200m", "300m", "500m", "1,000m", "1,500m", "3,000m"]
                 
@@ -422,25 +421,34 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     with created_tabs[0]:
         if not display_records.empty:
             filtered_df = display_records.copy()
-            if is_admin:
-                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-                with f_col1: filter_grade = st.selectbox("학년 필터", ["전체", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"])
-                with f_col2: filter_gender = st.selectbox("성별 필터", ["전체", "남자", "여자"])
-                if filter_grade != "전체": filtered_df = filtered_df[filtered_df["학년"] == filter_grade]
-                if filter_gender != "전체": filtered_df = filtered_df[filtered_df["성별"] == filter_gender]
-                with f_col3: view_mode = st.radio("방식", ["전체", "개별 선수 선택"], horizontal=True)
-                with f_col4:
-                    if view_mode == "개별 선수 선택" and not filtered_df.empty:
-                        target_user = st.selectbox("선수", filtered_df["이름"].unique())
-                        filtered_df = filtered_df[filtered_df["이름"] == target_user]
-            else:
-                view_mode = "개별 선수 선택"
+            
+            # 필터 UI 배치 (학년, 성별, 종목, 조회 방식 등)
+            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+            with f_col1: 
+                filter_grade = st.selectbox("학년 필터", ["전체", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"])
+            with f_col2: 
+                filter_gender = st.selectbox("성별 필터", ["전체", "남자", "여자"])
+            
+            if filter_grade != "전체": 
+                filtered_df = filtered_df[filtered_df["학년"] == filter_grade]
+            if filter_gender != "전체": 
+                filtered_df = filtered_df[filtered_df["성별"] == filter_gender]
+                
+            with f_col3: 
+                view_mode = st.radio("방식", ["전체", "개별 선수 선택"], horizontal=True)
+            with f_col4:
+                if view_mode == "개별 선수 선택" and not filtered_df.empty:
+                    target_user = st.selectbox("선수", filtered_df["이름"].unique())
+                    filtered_df = filtered_df[filtered_df["이름"] == target_user]
 
             if not filtered_df.empty:
                 st.write("---")
                 c_event_col, c_time_unit_col = st.columns([1, 1])
-                with c_event_col: selected_event_type = st.selectbox("종목 선택", filtered_df["종목"].unique())
-                with c_time_unit_col: time_unit = st.radio("조회 단위", ["일별", "월별"], horizontal=True)
+                with c_event_col: 
+                    all_events = filtered_df["종목"].unique().tolist()
+                    selected_event_type = st.selectbox("종목 선택", all_events if all_events else ["300m"])
+                with c_time_unit_col: 
+                    time_unit = st.radio("조회 단위", ["일별", "월별"], horizontal=True)
                 
                 user_event_df = filtered_df[filtered_df["종목"] == selected_event_type].copy()
                 if not user_event_df.empty:
@@ -448,24 +456,51 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     user_event_df = user_event_df.dropna(subset=["초"])
                     
                     if not user_event_df.empty:
-                        user_event_df["입력 날짜_str"] = pd.to_datetime(user_event_df["입력 날짜"]).dt.strftime("%Y-%m-%d")
-                        group_col = "입력 날짜_str"
-                        grouped_df = user_event_df.groupby(group_col, as_index=False)["초"].mean().round(2)
-                        grouped_df = grouped_df.sort_values(group_col)
+                        if time_unit == "월별":
+                            user_event_df["입력 날짜_str"] = pd.to_datetime(user_event_df["입력 날짜"]).dt.strftime("%Y-%m")
+                        else:
+                            user_event_df["입력 날짜_str"] = pd.to_datetime(user_event_df["입력 날짜"]).dt.strftime("%Y-%m-%d")
                         
                         fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=grouped_df[group_col], y=grouped_df["초"],
-                            mode='lines+markers+text', text=grouped_df["초"].apply(lambda x: f"{x:.2f}초"),
-                            textposition="top center", name='기록 추이',
-                            line=dict(color='#1f77b4', width=3), marker=dict(size=10)
-                        ))
+                        
+                        if view_mode == "전체":
+                            # 학년/성별 조건에 맞는 모든 선수들의 기록을 각각의 선(Line)으로 표시
+                            for athlete_name, group_data in user_event_df.groupby("이름"):
+                                sorted_group = group_data.sort_values("입력 날짜_str")
+                                fig.add_trace(go.Scatter(
+                                    x=sorted_group["입력 날짜_str"], 
+                                    y=sorted_group["초"],
+                                    mode='lines+markers+text', 
+                                    text=sorted_group["초"].apply(lambda x: f"{x:.2f}초"),
+                                    textposition="top center", 
+                                    name=athlete_name
+                                ))
+                        else:
+                            # 개별 선수 선택 시
+                            grouped_df = user_event_df.groupby("입력 날짜_str", as_index=False)["초"].mean().round(2)
+                            grouped_df = grouped_df.sort_values("입력 날짜_str")
+                            fig.add_trace(go.Scatter(
+                                x=grouped_df["입력 날짜_str"], 
+                                y=grouped_df["초"],
+                                mode='lines+markers+text', 
+                                text=grouped_df["초"].apply(lambda x: f"{x:.2f}초"),
+                                textposition="top center", 
+                                name='기록 추이',
+                                line=dict(color='#1f77b4', width=3), marker=dict(size=10)
+                            ))
+                            
                         fig.update_layout(
                             title="📈 랩타임 기록 추이 분석",
-                            xaxis=dict(title="측정 날짜", type='category', categoryorder='array', categoryarray=grouped_df[group_col].tolist()),
+                            xaxis=dict(title="측정 날짜", type='category'),
                             yaxis=dict(title="기록 (초)", rangemode="tozero")
                         )
                         st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("선택한 조건에 유효한 초 기록 데이터가 없습니다.")
+                else:
+                    st.info("선택한 종목에 대한 기록이 없습니다.")
+            else:
+                st.info("조건에 맞는 기록 데이터가 없습니다.")
 
     with created_tabs[1]:
         if not display_records.empty:
@@ -550,7 +585,8 @@ elif main_menu == "🔐 비밀번호 변경":
             st.session_state.users = load_json(USERS_FILE, default_users)
             stored_pw = st.session_state.users[user_id]["pw"]
             
-            if current_pw != stored_pw:
+            id_check = (current_pw == stored_pw)
+            if not id_check:
                 st.error("현재 비밀번호가 일치하지 않습니다.")
             elif not new_pw:
                 st.error("새로운 비밀번호를 입력해주세요.")
