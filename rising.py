@@ -1,4 +1,3 @@
-import streamlit as st
 import os
 import shutil
 import json
@@ -39,27 +38,11 @@ def save_json(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# 3. 비디오 파일 처리 (클럽 데이터 폴더 안의 assets 활용)
-video_files = {
-    "main": r"C:\Users\User\Downloads\band_video_2026_07_18_23_28_26.mp4",
-}
-
-for key, source_path in video_files.items():
-    if os.path.exists(source_path):
-        filename = os.path.basename(source_path)
-        target_path = os.path.join(ASSETS_DIR, filename)
-        if not os.path.exists(target_path):
-            try:
-                shutil.copy(source_path, target_path)
-            except:
-                pass
-
+# 3. 비디오 파일 처리 (club_data 폴더 안의 assets 활용)
 def play_main_video():
-    # club_data/assets 폴더 안에 넣은 동영상 파일 이름으로 지정합니다
-    video_path = os.path.join(ASSETS_DIR, "video.mp4") # 본인이 넣은 파일명으로 수정하세요
+    video_path = os.path.join(ASSETS_DIR, "video.mp4")
     
     if os.path.exists(video_path):
-        # Streamlit 내장 함수로 동영상 파일(바이너리)을 바로 재생합니다
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         st.video(video_bytes)
@@ -184,6 +167,10 @@ menu_options = ["홈 (기본 영상)", "1. 개인별 LAB Time Recorder", "2. 대
 if is_admin:
     menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
 
+# 로그인 상태일 때 '비밀번호 변경' 메뉴 추가
+if current_id:
+    menu_options.append("🔐 비밀번호 변경")
+
 main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options)
 
 selected_event = None
@@ -268,7 +255,9 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     current_user_info = st.session_state.users[current_id]
     st.session_state.lab_records = pd.DataFrame(load_json(RECORDS_FILE, []))
     if st.session_state.lab_records.empty:
-        st.session_state.lab_records = pd.DataFrame(columns=["ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"])
+        st.session_state.lab_records = pd.DataFrame(columns=[
+            "ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"
+        ])
 
     display_records = st.session_state.lab_records if is_admin else st.session_state.lab_records[
         (st.session_state.lab_records["ID"] == current_id) | 
@@ -462,3 +451,33 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
 
     users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
     st.dataframe(users_df, use_container_width=True)
+
+elif main_menu == "🔐 비밀번호 변경":
+    st.title("🔐 계정 비밀번호 변경")
+    if not st.session_state.logged_in_user:
+        st.warning("로그인이 필요합니다.")
+        st.stop()
+        
+    user_id = st.session_state.logged_in_user
+    
+    with st.form("change_pw_form"):
+        current_pw = st.text_input("현재 비밀번호", type="password")
+        new_pw = st.text_input("새로운 비밀번호", type="password")
+        new_pw_confirm = st.text_input("새로운 비밀번호 확인", type="password")
+        
+        submitted = st.form_submit_button("비밀번호 변경하기")
+        if submitted:
+            # 저장된 사용자 정보 다시 불러오기
+            st.session_state.users = load_json(USERS_FILE, default_users)
+            stored_pw = st.session_state.users[user_id]["pw"]
+            
+            if current_pw != stored_pw:
+                st.error("현재 비밀번호가 일치하지 않습니다.")
+            elif not new_pw:
+                st.error("새로운 비밀번호를 입력해주세요.")
+            elif new_pw != new_pw_confirm:
+                st.error("새로운 비밀번호와 확인란이 서로 일치하지 않습니다.")
+            else:
+                st.session_state.users[user_id]["pw"] = new_pw
+                save_users_to_disk()
+                st.success("🎉 비밀번호가 안전하게 변경되었습니다! 다음 로그인부터 변경된 비밀번호를 사용하세요.")
