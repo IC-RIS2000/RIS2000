@@ -46,7 +46,11 @@ def play_main_video():
     if os.path.exists(video_path):
         with open(video_path, "rb") as f:
             video_bytes = f.read()
-        st.video(video_bytes)
+        
+        # 화면을 3등분하여 가운데(1열 공간)에만 동영상을 배치하여 크기를 줄입니다.
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.video(video_bytes)
     else:
         st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
