@@ -11,10 +11,13 @@ import numpy as np
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
-# 2. 데이터 영구 저장을 위한 JSON 파일 경로 설정 (exist_ok=True 추가하여 오류 방지)
+# 2. 데이터 및 미디어 저장을 위한 로컬 폴더 경로 설정 (클라우드 권한 오류 해결)
 DATA_DIR = "club_data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR, exist_ok=True)
+ASSETS_DIR = os.path.join(DATA_DIR, "assets")
+
+for d in [DATA_DIR, ASSETS_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d, exist_ok=True)
 
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
@@ -36,12 +39,7 @@ def save_json(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# 3. 정적 폴더 경로 설정
-STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), "static")
-ASSETS_PATH = os.path.join(STREAMLIT_STATIC_PATH, "assets")
-if not os.path.exists(ASSETS_PATH):
-    os.makedirs(ASSETS_PATH, exist_ok=True)
-
+# 3. 비디오 파일 처리 (클럽 데이터 폴더 안의 assets 활용)
 video_files = {
     "main": r"C:\Users\User\Downloads\band_video_2026_07_18_23_28_26.mp4",
 }
@@ -49,7 +47,7 @@ video_files = {
 for key, source_path in video_files.items():
     if os.path.exists(source_path):
         filename = os.path.basename(source_path)
-        target_path = os.path.join(ASSETS_PATH, filename)
+        target_path = os.path.join(ASSETS_DIR, filename)
         if not os.path.exists(target_path):
             try:
                 shutil.copy(source_path, target_path)
@@ -59,18 +57,18 @@ for key, source_path in video_files.items():
 def play_main_video():
     main_path = video_files["main"]
     filename = os.path.basename(main_path)
-    target_path = os.path.join(ASSETS_PATH, filename)
+    target_path = os.path.join(ASSETS_DIR, filename)
     active_path = target_path if os.path.exists(target_path) else main_path
     
     if os.path.exists(active_path):
-        video_html = f"""
-        <div style="display: flex; justify-content: center; width: 100%;">
-            <video controls autoplay muted loop playsinline preload="metadata" oncontextmenu="return false;" style="max-width: 100%; height: auto; border-radius: 12px;">
-                <source src="assets/{filename}" type="video/mp4">
-            </video>
-        </div>
-        """
-        st.markdown(video_html, unsafe_allow_html=True)
+        # 웹상에서 안정적으로 재생되도록 처리
+        if os.path.exists(target_path):
+            # 클라우드 환경에서는 바이너리 스트림이나 상대 경로 활용
+            with open(target_path, "rb") as video_file:
+                video_bytes = video_file.read()
+            st.video(video_bytes)
+        else:
+            st.warning("메인 동영상 파일을 찾을 수 없습니다.")
 
 # 4. 나이 및 정확한 학년 계산 함수
 def get_age_by_birth_year(birth_year):
