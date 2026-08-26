@@ -270,10 +270,14 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             "ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"
         ])
 
-    display_records = st.session_state.lab_records if is_admin else st.session_state.lab_records[
-        (st.session_state.lab_records["ID"] == current_id) | 
-        (st.session_state.lab_records["이름"] == current_user_info["name"].strip())
-    ]
+    # 일반 사용자는 본인 ID나 본인 이름으로 등록된 기록만 조회 가능
+    if is_admin:
+        display_records = st.session_state.lab_records
+    else:
+        display_records = st.session_state.lab_records[
+            (st.session_state.lab_records["ID"] == current_id) | 
+            (st.session_state.lab_records["이름"] == current_user_info["name"].strip())
+        ]
 
     if is_admin:
         st.markdown("### 📝 기록 등록 방식 선택")
@@ -282,8 +286,17 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         if input_method == "직접 수동 입력":
             grade_options = ["유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
             selected_grade = st.selectbox("학년", grade_options)
-            grade_members = {uid: uinfo["name"] for uid, uinfo in st.session_state.users.items() if uinfo.get("grade") == selected_grade}
-            selected_name = st.selectbox("선수", list(grade_members.values()) if grade_members else ["없음"])
+            
+            # 학년에 해당하는 회원 딕셔너리 (ID: 이름) 생성
+            grade_members = {uid: uinfo["name"] for uid, uinfo in st.session_state.users.items() if uinfo.get("grade") == selected_grade and uinfo.get("role") != "admin"}
+            
+            if grade_members:
+                selected_uid = st.selectbox("선수 선택", list(grade_members.keys()), format_func=lambda x: grade_members[x])
+                selected_name = grade_members[selected_uid]
+            else:
+                selected_uid = "unknown"
+                selected_name = "없음"
+                st.warning("해당 학년에 등록된 승인된 회원이 없습니다.")
             
             with st.form("manual_rec_form", clear_on_submit=True):
                 r_date = st.date_input("날짜", datetime.now())
@@ -291,11 +304,22 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 r_event = st.selectbox("종목", ["300m", "500m", "1,000m"])
                 r_time = st.text_input("기록 (초)")
                 if st.form_submit_button("저장"):
-                    new_row = pd.DataFrame([{"ID": current_id, "입력 날짜": r_date.strftime("%Y-%m-%d"), "이름": selected_name, "학년": selected_grade, "성별": r_gender, "종목": r_event, "기록": r_time}])
-                    st.session_state.lab_records = pd.concat([st.session_state.lab_records, new_row], ignore_index=True)
-                    save_records_to_disk()
-                    st.success("저장 완료")
-                    st.rerun()
+                    if selected_uid == "unknown":
+                        st.error("올바른 선수를 선택해주세요.")
+                    else:
+                        new_row = pd.DataFrame([{
+                            "ID": selected_uid, 
+                            "입력 날짜": r_date.strftime("%Y-%m-%d"), 
+                            "이름": selected_name, 
+                            "학년": selected_grade, 
+                            "성별": r_gender, 
+                            "종목": r_event, 
+                            "기록": r_time
+                        }])
+                        st.session_state.lab_records = pd.concat([st.session_state.lab_records, new_row], ignore_index=True)
+                        save_records_to_disk()
+                        st.success("저장 완료")
+                        st.rerun()
         else:
             st.markdown("#### 📷 수기 기록표 이미지 업로드 및 표 추출")
             uploaded_sheet = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png"])
