@@ -276,6 +276,27 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     if "측정 회차" not in st.session_state.lab_records.columns:
         st.session_state.lab_records["측정 회차"] = "1회차"
 
+    # 기록 데이터의 학년 및 성별을 실제 회원 정보와 실시간 동기화
+    for idx, row in st.session_state.lab_records.iterrows():
+        r_id = row.get("ID")
+        r_name = str(row.get("이름")).strip()
+        
+        # ID로 먼저 매칭 시도, 없으면 이름으로 매칭
+        matched_user = None
+        if r_id in st.session_state.users:
+            matched_user = st.session_state.users[r_id]
+        else:
+            for uid, udata in st.session_state.users.items():
+                if udata.get("name", "").strip() == r_name:
+                    matched_user = udata
+                    break
+        
+        if matched_user:
+            if matched_user.get("gender"):
+                st.session_state.lab_records.at[idx, "성별"] = matched_user.get("gender")
+            if matched_user.get("grade"):
+                st.session_state.lab_records.at[idx, "학년"] = matched_user.get("grade")
+
     if is_admin:
         display_records = st.session_state.lab_records
     else:
@@ -305,7 +326,9 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             with st.form("manual_rec_form", clear_on_submit=True):
                 r_date = st.date_input("날짜", datetime.now())
                 r_round = st.selectbox("측정 회차", ["1회차", "2회차", "3회차", "4회차", "5회차"])
-                r_gender = st.selectbox("성별", ["남자", "여자"])
+                # 선택된 회원의 성별을 회원 정보에서 자동 가져오기
+                auto_gender = st.session_state.users.get(selected_uid, {}).get("gender", "남자")
+                r_gender = st.selectbox("성별", ["남자", "여자"], index=0 if auto_gender == "남자" else 1)
                 r_event = st.selectbox("종목", ["100m", "300m", "500m", "1,000m"])
                 r_time = st.text_input("기록 (초)")
                 if st.form_submit_button("저장"):
@@ -511,18 +534,18 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 st.info("조건에 맞는 기록 데이터가 없습니다.")
 
     with created_tabs[1]:
-        st.markdown("### 📋 등록 기록 및 전국 최상위권 기준 비교")
+        st.markdown("### 📋 등록 기록 및 전국 최상위권 비교")
         if not display_records.empty:
             merged_view_df = display_records.copy()
             merged_view_df["초기록"] = merged_view_df["기록"].apply(convert_record_to_seconds)
             
-            diff_list = []
-            top_rank_list = []
+            combined_record_list = []
             for idx, row in merged_view_df.iterrows():
                 g = row["학년"]
                 ge = row["성별"]
                 ev = row["종목"]
                 sec = row["초기록"]
+                raw_rec = row["기록"]
                 
                 bm_row = benchmark_df[
                     (benchmark_df["학년"] == g) & 
@@ -532,22 +555,23 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 
                 if not bm_row.empty and sec is not None:
                     top_val = float(bm_row.iloc[0]["최상위권"])
-                    top_rank_list.append(f"{top_val:.2f}초")
                     diff = sec - top_val
                     if diff > 0:
-                        diff_list.append(f"+{diff:.2f}초 느림 ⚠️")
+                        diff_str = f"+{diff:.2f}초 느림 ⚠️"
                     elif diff < 0:
-                        diff_list.append(f"{diff:.2f}초 빠름 🔥")
+                        diff_str = f"{diff:.2f}초 빠름 🔥"
                     else:
-                        diff_list.append("기준 동일 ✨")
+                        diff_str = "기준 동일 ✨"
+                    
+                    # 요청하신 대로 하나의 열에 통합 포맷팅
+                    combined_record_list.append(f"{raw_rec} / 최상위권 {top_val:.2f}초 ({diff_str})")
                 else:
-                    top_rank_list.append("기준 없음")
-                    diff_list.append("비교 불가 ➖")
+                    combined_record_list.append(f"{raw_rec} / 기준 없음 ➖")
             
-            merged_view_df["전국최상위권"] = top_rank_list
-            merged_view_df["차이"] = diff_list
+            merged_view_df["기록 (최상위권 비교)"] = combined_record_list
             
-            display_cols_order = ["입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록", "전국최상위권", "차이"]
+            # 독립된 최상위권 및 차이 컬럼을 없애고 통합된 기록 컬럼으로 대체
+            display_cols_order = ["입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록 (최상위권 비교)"]
             final_show_df = merged_view_df[[c for c in display_cols_order if c in merged_view_df.columns]]
             
             st.dataframe(final_show_df, use_container_width=True)
