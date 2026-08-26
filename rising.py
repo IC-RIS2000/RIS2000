@@ -1,17 +1,14 @@
 import streamlit as st
 import os
-import shutil
 import json
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from PIL import Image
-import numpy as np
 
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
-# 2. 데이터 및 미디어 저장을 위한 로컬 폴더 경로 설정 (클라우드 권한 오류 해결)
+# 2. 데이터 및 미디어 저장을 위한 로컬 폴더 경로 설정
 DATA_DIR = "club_data"
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")
 
@@ -39,7 +36,7 @@ def save_json(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# 3. 비디오 파일 처리 (club_data 폴더 안의 assets 활용)
+# 3. 비디오 파일 처리
 def play_main_video():
     video_path = os.path.join(ASSETS_DIR, "video.mp4")
     
@@ -50,7 +47,6 @@ def play_main_video():
         
         video_base64 = base64.b64encode(video_bytes).decode()
         
-        # 세로 크기를 브라우저 화면 높이의 상당 부분(75vh)을 차지하도록 대폭 키웁니다.
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px;">
@@ -183,7 +179,6 @@ menu_options = ["홈 (기본 영상)", "1. 개인별 LAB Time Recorder", "2. 대
 if is_admin:
     menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
 
-# 로그인 상태일 때 '비밀번호 변경' 메뉴 추가
 if current_id:
     menu_options.append("🔐 비밀번호 변경")
 
@@ -458,13 +453,38 @@ elif main_menu == "3. 건의사항":
 
 elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     st.title("👥 회원 관리")
-    if not is_admin: st.stop()
+    if not is_admin: 
+        st.stop()
     
     for uid, udata in st.session_state.users.items():
         if "birth_year" in udata and udata["birth_year"]:
             udata["grade"] = get_grade_by_birth_year(udata["birth_year"])
     save_users_to_disk()
 
+    st.subheader("⏳ 가입 승인 대기 목록")
+    pending_users = {uid: udata for uid, udata in st.session_state.users.items() if udata.get("status") == "pending"}
+    
+    if pending_users:
+        for uid, udata in pending_users.items():
+            with st.container(border=True):
+                cols = st.columns([3, 3, 2])
+                with cols[0]:
+                    st.write(f"**아이디:** {uid}")
+                    st.write(f"**이름:** {udata.get('name', '-')}")
+                with cols[1]:
+                    st.write(f"**학년:** {udata.get('grade', '-')}")
+                    st.write(f"**연락처:** {udata.get('phone', '-')}")
+                with cols[2]:
+                    if st.button("✅ 승인하기", key=f"approve_{uid}", use_container_width=True):
+                        st.session_state.users[uid]["status"] = "approved"
+                        save_users_to_disk()
+                        st.success(f"{udata.get('name')}님 승인 완료!")
+                        st.rerun()
+    else:
+        st.info("현재 승인 대기 중인 회원이 없습니다.")
+
+    st.markdown("---")
+    st.subheader("📋 전체 회원 목록")
     users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
     st.dataframe(users_df, use_container_width=True)
 
@@ -483,7 +503,6 @@ elif main_menu == "🔐 비밀번호 변경":
         
         submitted = st.form_submit_button("비밀번호 변경하기")
         if submitted:
-            # 저장된 사용자 정보 다시 불러오기
             st.session_state.users = load_json(USERS_FILE, default_users)
             stored_pw = st.session_state.users[user_id]["pw"]
             
