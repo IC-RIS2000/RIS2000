@@ -55,20 +55,16 @@ for key, source_path in video_files.items():
                 pass
 
 def play_main_video():
-    main_path = video_files["main"]
-    filename = os.path.basename(main_path)
-    target_path = os.path.join(ASSETS_DIR, filename)
-    active_path = target_path if os.path.exists(target_path) else main_path
+    # club_data/assets 폴더 안에 넣은 동영상 파일 이름으로 지정합니다
+    video_path = os.path.join(ASSETS_DIR, "video.mp4") # 본인이 넣은 파일명으로 수정하세요
     
-    if os.path.exists(active_path):
-        # 웹상에서 안정적으로 재생되도록 처리
-        if os.path.exists(target_path):
-            # 클라우드 환경에서는 바이너리 스트림이나 상대 경로 활용
-            with open(target_path, "rb") as video_file:
-                video_bytes = video_file.read()
-            st.video(video_bytes)
-        else:
-            st.warning("메인 동영상 파일을 찾을 수 없습니다.")
+    if os.path.exists(video_path):
+        # Streamlit 내장 함수로 동영상 파일(바이너리)을 바로 재생합니다
+        with open(video_path, "rb") as f:
+            video_bytes = f.read()
+        st.video(video_bytes)
+    else:
+        st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
 # 4. 나이 및 정확한 학년 계산 함수
 def get_age_by_birth_year(birth_year):
