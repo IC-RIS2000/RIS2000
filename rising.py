@@ -703,23 +703,35 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                                 app_event3_raw = st.text_input("참가 종목 3 (선택, 숫자만)", value="", placeholder="예: 1000")
                                 
                                 if st.form_submit_button("🙋 참가 희망 신청하기", use_container_width=True):
-                                    # 숫자만 입력받아 뒤에 'm' 붙이기 (입력값이 있을 경우에만)
-                                    e1 = f"{app_event1_raw.strip()}m" if app_event1_raw.strip() else ""
-                                    e2 = f"{app_event2_raw.strip()}m" if app_event2_raw.strip() else ""
-                                    e3 = f"{app_event3_raw.strip()}m" if app_event3_raw.strip() else ""
-                                    
-                                    new_applicant = {
-                                        "id": st.session_state.logged_in_user,
-                                        "name": user_data.get("name", "이름없음"),
-                                        "grade": user_data.get("grade", "회원"),
-                                        "event1": e1,
-                                        "event2": e2,
-                                        "event3": e3
-                                    }
-                                    comp["applicants"].append(new_applicant)
-                                    save_competitions_to_disk()
-                                    st.success("참가 신청이 완료되었습니다!")
-                                    st.rerun()
+                                    def validate_and_format_event(val):
+                                        val_stripped = val.strip()
+                                        if not val_stripped:
+                                            return "", True
+                                        if val_stripped.isdigit():
+                                            return f"{val_stripped}m", True
+                                        return "", False
+
+                                    e1, valid1 = validate_and_format_event(app_event1_raw)
+                                    e2, valid2 = validate_and_format_event(app_event2_raw)
+                                    e3, valid3 = validate_and_format_event(app_event3_raw)
+
+                                    if not (valid1 and valid2 and valid3):
+                                        st.error("⚠️ 종목에는 숫자만 입력해 주세요! (예: 300)")
+                                    elif not e1:
+                                        st.error("⚠️ 최소 첫 번째 참가 종목은 입력해야 합니다.")
+                                    else:
+                                        new_applicant = {
+                                            "id": st.session_state.logged_in_user,
+                                            "name": user_data.get("name", "이름없음"),
+                                            "grade": user_data.get("grade", "회원"),
+                                            "event1": e1,
+                                            "event2": e2,
+                                            "event3": e3
+                                        }
+                                        comp["applicants"].append(new_applicant)
+                                        save_competitions_to_disk()
+                                        st.success("참가 신청이 완료되었습니다!")
+                                        st.rerun()
                         else:
                             st.success("✅ 참가 신청 완료됨")
                             if st.button("❌ 참가 신청 취소", key=f"cancel_apply_{comp['id']}", use_container_width=True):
@@ -737,7 +749,7 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                         e1 = app.get("event1", "")
                         e2 = app.get("event2", "")
                         e3 = app.get("event3", "")
-                        if not e1 and "event" in app:  # 구버전 데이터 대응
+                        if not e1 and "event" in app:
                             e1 = app["event"]
                         
                         formatted_applicants.append({
@@ -754,7 +766,6 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                     
                     st.dataframe(display_app_df, use_container_width=True)
                     
-                    # 관리자 모드인 경우 엑셀 다운로드 버튼 제공
                     if is_admin:
                         excel_data = convert_df_to_excel(display_app_df)
                         st.download_button(
