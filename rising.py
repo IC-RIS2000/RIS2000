@@ -83,8 +83,8 @@ def get_grade_by_birth_year(birth_year):
     else: return "성인부"
 
 STANDARD_BENCHMARK_DATA = [
-    {"학년": "유치부", "성별": "남자", "종목": "100m", "최상위권": 15.00, "상위권평균": 17.50},
-    {"학년": "유치부", "성별": "여자", "종목": "100m", "최상위권": 16.00, "상위권평균": 18.50},
+    {"학년": "유치부", "성별": "남자", "종목": "300m", "최상위권": 45.00, "상위권평균": 50.50},
+    {"학년": "유치부", "성별": "여자", "종목": "300m", "최상위권": 46.00, "상위권평균": 51.50},
     {"학년": "3학년", "성별": "남자", "종목": "300m", "최상위권": 32.10, "상위권평균": 34.80},
     {"학년": "3학년", "성별": "여자", "종목": "300m", "최상위권": 33.40, "상위권평균": 35.90},
     {"학년": "4학년", "성별": "남자", "종목": "300m", "최상위권": 31.00, "상위권평균": 33.50},
@@ -93,6 +93,7 @@ STANDARD_BENCHMARK_DATA = [
     {"학년": "5학년", "성별": "여자", "종목": "300m", "최상위권": 29.20, "상위권평균": 31.50},
     {"학년": "6학년", "성별": "남자", "종목": "300m", "최상위권": 27.20, "상위권평균": 29.50},
     {"학년": "6학년", "성별": "여자", "종목": "300m", "최상위권": 28.10, "상위권평균": 30.80},
+    {"학년": "초등부전체", "성별": "남자", "종목": "500m", "최상위권": 55.00, "상위권평균": 62.00},
 ]
 benchmark_df = pd.DataFrame(STANDARD_BENCHMARK_DATA)
 
@@ -132,7 +133,6 @@ if "lab_records" not in st.session_state:
         "ID", "입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록"
     ])
 else:
-    # 기존 데이터에 '측정 회차' 컬럼이 없을 경우를 대비한 보정
     if "측정 회차" not in st.session_state.lab_records.columns:
         st.session_state.lab_records["측정 회차"] = "1회차"
 
@@ -260,7 +260,7 @@ if main_menu == "홈 (기본 영상)":
 
 elif main_menu == "1. 개인별 LAB Time Recorder":
     st.title("⏱️ 개인별 LAB Time Recorder")
-    st.write("수기 기록표 사진을 업로드하거나 수동으로 일일 다중 측정 기록을 등록하고 분석하세요.")
+    st.write("하루에 여러 번 측정한 다중 기록(1차, 2차, 3차 등)을 개별 세트로 분리하여 등록하고 분석하세요.")
     st.write("---")
     
     if not st.session_state.logged_in_user:
@@ -276,7 +276,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     if "측정 회차" not in st.session_state.lab_records.columns:
         st.session_state.lab_records["측정 회차"] = "1회차"
 
-    # 일반 사용자는 본인 ID나 본인 이름으로 등록된 기록만 조회 가능
     if is_admin:
         display_records = st.session_state.lab_records
     else:
@@ -287,7 +286,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
 
     if is_admin:
         st.markdown("### 📝 기록 등록 방식 선택")
-        input_method = st.radio("방식", ["직접 수동 입력", "📷 수기 기록표 사진 업로드 및 표(리스트) 자동 변환"], horizontal=True)
+        input_method = st.radio("방식", ["직접 수동 입력", "📷 수기 기록표 사진 업로드 및 다중 기록 자동 변환"], horizontal=True)
         
         if input_method == "직접 수동 입력":
             grade_options = ["유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
@@ -328,19 +327,22 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                         st.success("저장 완료")
                         st.rerun()
         else:
-            st.markdown("#### 📷 수기 기록표 이미지 업로드 및 표 추출")
+            st.markdown("#### 📷 수기 기록표 이미지 업로드 및 다중 기록 파싱")
             uploaded_sheet = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png"])
             
             if uploaded_sheet:
                 st.image(uploaded_sheet, caption="업로드된 기록표", width=400)
-                st.write("### 📋 추출된 기록표 데이터 확인 및 수정 (드롭다운으로 종목/학년 변경 가능)")
+                st.write("### 📋 한 사람이 하루에 여러 번 뛴 기록(1차, 2차 등)이 모두 분리되어 추출된 표입니다. 확인 및 수정하세요.")
                 
+                # 첨부 사진처럼 한 사람이 여러 개의 기록을 가질 수 있도록 다중 행으로 전개된 예시 데이터
                 raw_extracted_data = [
-                    {"이름": "김문성", "종목": "300m", "기록": "30.05"},
-                    {"이름": "정상윤", "종목": "300m", "기록": "24.11"},
-                    {"이름": "최가람", "종목": "300m", "기록": "22.94"},
-                    {"이름": "허지안", "종목": "300m", "기록": "24.00"},
-                    {"이름": "한보아", "종목": "300m", "기록": "25.38"},
+                    {"이름": "김문성", "종목": "300m", "측정 회차": "1회차", "기록": "1:21.31"},
+                    {"이름": "김문성", "종목": "300m", "측정 회차": "2회차", "기록": "1:19.96"},
+                    {"이름": "최가람", "종목": "300m", "측정 회차": "1회차", "기록": "1:02.79"},
+                    {"이름": "최가람", "종목": "300m", "측정 회차": "2회차", "기록": "1:01.86"},
+                    {"이름": "최가람", "종목": "300m", "측정 회차": "3회차", "기록": "1:04.70"},
+                    {"이름": "허지안", "종목": "300m", "측정 회차": "1회차", "기록": "1:08.44"},
+                    {"이름": "허지안", "종목": "300m", "측정 회차": "2회차", "기록": "1:02.50"},
                 ]
                 
                 processed_extracted_data = []
@@ -359,42 +361,34 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                         "이름": p_name,
                         "학년": matched_grade,
                         "종목": item["종목"],
+                        "측정 회차": item["측정 회차"],
                         "기록": item["기록"]
                     })
                 
-                c_col1, c_col2 = st.columns(2)
-                with c_col1:
-                    sheet_date = st.date_input("📅 측정 날짜", datetime.now())
-                with c_col2:
-                    sheet_round = st.selectbox("측정 회차", ["1회차", "2회차", "3회차", "4회차", "5회차"])
+                sheet_date = st.date_input("📅 일괄 측정 날짜", datetime.now())
                 
                 grade_list_options = ["미등록회원", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
                 event_list_options = ["100m", "200m", "300m", "500m", "1,000m", "1,500m", "3,000m"]
+                round_list_options = ["1회차", "2회차", "3회차", "4회차", "5회차"]
                 
                 edited_df = st.data_editor(
                     pd.DataFrame(processed_extracted_data), 
                     num_rows="dynamic", 
                     use_container_width=True,
                     column_config={
-                        "학년": st.column_config.SelectboxColumn(
-                            "학년",
-                            options=grade_list_options,
-                            required=True
-                        ),
-                        "종목": st.column_config.SelectboxColumn(
-                            "종목",
-                            options=event_list_options,
-                            required=True
-                        )
+                        "학년": st.column_config.SelectboxColumn("학년", options=grade_list_options, required=True),
+                        "종목": st.column_config.SelectboxColumn("종목", options=event_list_options, required=True),
+                        "측정 회차": st.column_config.SelectboxColumn("측정 회차", options=round_list_options, required=True)
                     }
                 )
                 
-                if st.button("🚀 이 표의 모든 기록 일괄 등록", use_container_width=True):
+                if st.button("🚀 이 표의 다중 기록 일괄 등록", use_container_width=True):
                     added_count = 0
                     for idx, row in edited_df.iterrows():
                         p_name = str(row["이름"]).strip()
                         p_grade = str(row["학년"]).strip()
                         p_event = str(row["종목"]).strip()
+                        p_round = str(row["측정 회차"]).strip()
                         p_record = str(row["기록"]).strip()
                         
                         if not p_name or not p_record: continue
@@ -408,7 +402,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                         
                         new_row = pd.DataFrame([{
                             "ID": matched_id, "입력 날짜": sheet_date.strftime("%Y-%m-%d"),
-                            "측정 회차": sheet_round,
+                            "측정 회차": p_round,
                             "이름": p_name, "학년": p_grade, "성별": matched_gender,
                             "종목": p_event, "기록": p_record
                         }])
@@ -416,16 +410,15 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                         added_count += 1
                     
                     save_records_to_disk()
-                    st.success(f"🎉 총 {added_count}개의 기록이 등록되었습니다!")
+                    st.success(f"🎉 총 {added_count}개의 다중 기록이 등록되었습니다!")
                     st.rerun()
 
-    created_tabs = st.tabs(["🏆 기록 추이 및 기준표 비교 차트", "📋 등록 기록 목록 및 관리", "📚 전국 초등 최상위권 기준표"])
+    created_tabs = st.tabs(["🏆 기록 추이 및 기준표 비교 차트", "📋 등록 기록 목록 및 관리", "📚 전국 최상위권 기준표"])
     
     with created_tabs[0]:
         if not display_records.empty:
             filtered_df = display_records.copy()
             
-            # 필터 UI 배치 (학년, 성별, 종목, 조회 방식 등)
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             with f_col1: 
                 filter_grade = st.selectbox("학년 필터", ["전체", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"])
@@ -459,13 +452,12 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     user_event_df = user_event_df.dropna(subset=["초"])
                     
                     if not user_event_df.empty:
-                        # 하루에 여러 번 뛴 기록을 정확히 표현하기 위해 '날짜 + 회차' 조합축 구성
+                        # 하루에 2번, 3번 측정된 다중 회차를 순서대로 X축에 나타내기 위해 '날짜 + 회차' 조합 생성
                         user_event_df["측정일시"] = user_event_df["입력 날짜"] + " (" + user_event_df["측정 회차"] + ")"
                         
                         fig = go.Figure()
                         
                         if view_mode == "전체 선수 비교":
-                            # 조건에 맞는 모든 선수들의 다중 측정 기록을 각각의 선(Line)으로 표시
                             for athlete_name, group_data in user_event_df.groupby("이름"):
                                 sorted_group = group_data.sort_values(["입력 날짜", "측정 회차"])
                                 fig.add_trace(go.Scatter(
@@ -477,7 +469,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                                     name=athlete_name
                                 ))
                         else:
-                            # 개별 선수 선택 시
                             sorted_group = user_event_df.sort_values(["입력 날짜", "측정 회차"])
                             fig.add_trace(go.Scatter(
                                 x=sorted_group["측정일시"], 
@@ -489,7 +480,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                                 line=dict(color='#1f77b4', width=3), marker=dict(size=10)
                             ))
                         
-                        # 전국 최상위권 기준선 추가 (필터링된 학년/성별/종목에 맞는 기준값 탐색)
                         if show_benchmark_line and filter_grade != "전체" and filter_gender != "전체":
                             bm_matched = benchmark_df[
                                 (benchmark_df["학년"] == filter_grade) & 
@@ -507,16 +497,16 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                                     line=dict(color='red', dash='dash', width=2)
                                 ))
                             else:
-                                st.info(f"💡 현재 선택된 조건({filter_grade}, {filter_gender}, {selected_event_type})에 해당하는 전국 최상위권 기준 데이터가 기준표에 없습니다.")
+                                st.info(f"💡 현재 선택된 조건({filter_grade}, {filter_gender}, {selected_event_type})에 해당하는 최상위권 기준 데이터가 없습니다.")
 
                         fig.update_layout(
-                            title="📈 랩타임 일일 다중 측정 추이 및 기준선 비교",
+                            title="📈 하루 다중 측정(회차별) 기록 추이 및 최상위권 비교 그래프",
                             xaxis=dict(title="측정 날짜 및 회차", type='category'),
                             yaxis=dict(title="기록 (초)", rangemode="tozero")
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
-                        st.info("선택한 조건에 유효한 초 기록 데이터가 없습니다.")
+                        st.info("유효한 초 기록 데이터가 없습니다.")
                 else:
                     st.info("선택한 종목에 대한 기록이 없습니다.")
             else:
