@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+from io import BytesIO
 
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
@@ -179,6 +180,14 @@ def convert_record_to_seconds(record_str):
     except:
         return None
 
+# DataFrame을 Excel 바이너리로 변환하는 함수
+def convert_df_to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='참가신청명단')
+    processed_data = output.getvalue()
+    return processed_data
+
 current_id = st.session_state.logged_in_user
 is_admin = False
 if current_id and current_id in st.session_state.users:
@@ -202,7 +211,6 @@ if main_menu == "3. 대회 사진첩":
     if st.session_state.event_folders:
         selected_event = st.sidebar.radio("이동할 사진첩을 선택하세요", st.session_state.event_folders)
     
-    # 관리자인 경우 사이드바 메뉴 아래에 직접 폴더 생성 및 삭제 기능 제공
     if is_admin:
         with st.sidebar.expander("🛠️ 폴더 추가/삭제 관리"):
             with st.form("add_folder_form", clear_on_submit=True):
@@ -629,7 +637,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
 
 elif main_menu == "2. 대회 참가 신청 및 명단":
     st.title("🏆 대회 참가 신청 및 희망 명단 대시보드")
-    st.write("대회명을 개설하고, 회원이 대회 참가 희망 신청을 하며, 실시간 참가자 명단을 관리 및 삭제할 수 있습니다.")
+    st.write("대회명을 개설하고, 회원이 여러 참가 종목을 자유롭게 입력하여 신청하며, 실시간 참가자 명단 확인 및 엑셀 다운로드가 가능합니다.")
     st.write("---")
 
     if is_admin:
@@ -689,13 +697,19 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                         
                         if not already_applied:
                             with st.form(f"apply_form_{comp['id']}"):
-                                app_event = st.text_input("참가 종목 (예: 300m, 계주 등)", value="300m")
+                                st.write("참가 종목을 최대 3개까지 각각 입력해주세요.")
+                                app_event1 = st.text_input("참가 종목 1", value="300m", placeholder="예: 300m")
+                                app_event2 = st.text_input("참가 종목 2", value="500m", placeholder="예: 500m")
+                                app_event3 = st.text_input("참가 종목 3", value="계주", placeholder="예: 계주")
+                                
                                 if st.form_submit_button("🙋 참가 희망 신청하기", use_container_width=True):
                                     new_applicant = {
                                         "id": st.session_state.logged_in_user,
                                         "name": user_data.get("name", "이름없음"),
                                         "grade": user_data.get("grade", "회원"),
-                                        "event": app_event.strip()
+                                        "event1": app_event1.strip(),
+                                        "event2": app_event2.strip(),
+                                        "event3": app_event3.strip()
                                     }
                                     comp["applicants"].append(new_applicant)
                                     save_competitions_to_disk()
@@ -713,18 +727,46 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                 st.markdown("#### 👥 실시간 대회 참가자 희망 명단")
                 applicants = comp.get("applicants", [])
                 if applicants:
-                    app_df = pd.DataFrame(applicants)
-                    app_df = app_df.rename(columns={"name": "이름", "grade": "학년", "event": "참가 종목"})
-                    display_app_df = app_df[["이름", "학년", "참가 종목"]]
+                    # 기존 데이터 호환성 처리 (단일 event 필드가 남아있는 경우 처리)
+                    formatted_applicants = []
+                    for app in applicants:
+                        e1 = app.get("event1", "")
+                        e2 = app.get("event2", "")
+                        e3 = app.get("event3", "")
+                        if not e1 and "event" in app:  # 구버전 데이터 대응
+                            e1 = app["event"]
+                        
+                        formatted_applicants.append({
+                            "이름": app.get("name"),
+                            "학년": app.get("grade"),
+                            "참가 종목1": e1,
+                            "참가 종목2": e2,
+                            "참가 종목3": e3,
+                            "id": app.get("id")
+                        })
+                    
+                    app_df = pd.DataFrame(formatted_applicants)
+                    display_app_df = app_df[["이름", "학년", "참가 종목1", "참가 종목2", "참가 종목3"]]
                     
                     st.dataframe(display_app_df, use_container_width=True)
+                    
+                    # 관리자 모드인 경우 엑셀 다운로드 버튼 제공
+                    if is_admin:
+                        excel_data = convert_df_to_excel(display_app_df)
+                        st.download_button(
+                            label=f"📥 '{comp['title']}' 참가 명단 엑셀 다운로드",
+                            data=excel_data,
+                            file_name=f"{comp['title']}_참가명단.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"excel_down_{comp['id']}"
+                        )
                     
                     if is_admin or st.session_state.logged_in_user:
                         with st.expander(f"⚙️ '{comp['title']}' 참가자 명단 개별 관리"):
                             app_names_to_delete = st.selectbox(
                                 "삭제할 참가자 선택", 
                                 options=range(len(applicants)), 
-                                format_func=lambda i: f"{applicants[i]['name']} ({applicants[i]['grade']} / {applicants[i]['event']})",
+                                format_func=lambda i: f"{applicants[i]['name']} ({applicants[i]['grade']})",
                                 key=f"del_select_{comp['id']}"
                             )
                             target_app = applicants[app_names_to_delete]
