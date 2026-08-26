@@ -184,7 +184,7 @@ if is_admin:
     menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
 
 if current_id:
-    menu_options.append("🔐 비밀번호 변경")
+    menu_options.append("🔐 개인정보 변경")
 
 main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options)
 
@@ -334,7 +334,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 st.image(uploaded_sheet, caption="업로드된 기록표", width=400)
                 st.write("### 📋 한 사람이 하루에 여러 번 뛴 기록(1차, 2차 등)이 모두 분리되어 추출된 표입니다. 확인 및 수정하세요.")
                 
-                # 첨부 사진처럼 한 사람이 여러 개의 기록을 가질 수 있도록 다중 행으로 전개된 예시 데이터
                 raw_extracted_data = [
                     {"이름": "김문성", "종목": "300m", "측정 회차": "1회차", "기록": "1:21.31"},
                     {"이름": "김문성", "종목": "300m", "측정 회차": "2회차", "기록": "1:19.96"},
@@ -452,7 +451,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     user_event_df = user_event_df.dropna(subset=["초"])
                     
                     if not user_event_df.empty:
-                        # 하루에 2번, 3번 측정된 다중 회차를 순서대로 X축에 나타내기 위해 '날짜 + 회차' 조합 생성
                         user_event_df["측정일시"] = user_event_df["입력 날짜"] + " (" + user_event_df["측정 회차"] + ")"
                         
                         fig = go.Figure()
@@ -577,20 +575,35 @@ elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
     users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
     st.dataframe(users_df, use_container_width=True)
 
-elif main_menu == "🔐 비밀번호 변경":
-    st.title("🔐 계정 비밀번호 변경")
+elif main_menu == "🔐 개인정보 변경":
+    st.title("🔐 개인정보 변경 (비밀번호 / 학년 / 성별)")
     if not st.session_state.logged_in_user:
         st.warning("로그인이 필요합니다.")
         st.stop()
         
     user_id = st.session_state.logged_in_user
+    current_user_data = st.session_state.users[user_id]
     
-    with st.form("change_pw_form"):
+    with st.form("change_profile_form"):
+        st.subheader("🔑 비밀번호 변경")
         current_pw = st.text_input("현재 비밀번호", type="password")
-        new_pw = st.text_input("새로운 비밀번호", type="password")
+        new_pw = st.text_input("새로운 비밀번호 (변경하지 않으려면 공백)", type="password")
         new_pw_confirm = st.text_input("새로운 비밀번호 확인", type="password")
         
-        submitted = st.form_submit_button("비밀번호 변경하기")
+        st.markdown("---")
+        st.subheader("👤 학년 및 성별 정보 수정")
+        
+        grade_options = ["유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
+        current_grade = current_user_data.get("grade", "유치부")
+        default_grade_idx = grade_options.index(current_grade) if current_grade in grade_options else 0
+        new_grade = st.selectbox("학년 수정", grade_options, index=default_grade_idx)
+        
+        gender_options = ["남자", "여자"]
+        current_gender = current_user_data.get("gender", "남자")
+        default_gender_idx = gender_options.index(current_gender) if current_gender in gender_options else 0
+        new_gender = st.radio("성별 수정", gender_options, index=default_gender_idx, horizontal=True)
+        
+        submitted = st.form_submit_button("개인정보 수정하기")
         if submitted:
             st.session_state.users = load_json(USERS_FILE, default_users)
             stored_pw = st.session_state.users[user_id]["pw"]
@@ -598,11 +611,15 @@ elif main_menu == "🔐 비밀번호 변경":
             id_check = (current_pw == stored_pw)
             if not id_check:
                 st.error("현재 비밀번호가 일치하지 않습니다.")
-            elif not new_pw:
-                st.error("새로운 비밀번호를 입력해주세요.")
-            elif new_pw != new_pw_confirm:
+            elif new_pw and new_pw != new_pw_confirm:
                 st.error("새로운 비밀번호와 확인란이 서로 일치하지 않습니다.")
             else:
-                st.session_state.users[user_id]["pw"] = new_pw
+                if new_pw:
+                    st.session_state.users[user_id]["pw"] = new_pw
+                
+                st.session_state.users[user_id]["grade"] = new_grade
+                st.session_state.users[user_id]["gender"] = new_gender
+                
                 save_users_to_disk()
-                st.success("🎉 비밀번호가 안전하게 변경되었습니다! 다음 로그인부터 변경된 비밀번호를 사용하세요.")
+                st.success("🎉 개인정보(비밀번호, 학년, 성별)가 안전하게 수정되었습니다!")
+                st.rerun()
