@@ -12,8 +12,9 @@ st.set_page_config(layout="wide", page_title="Rising Inline Club")
 # 2. 데이터 및 미디어 저장을 위한 로컬 폴더 경로 설정
 DATA_DIR = "club_data"
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")
+PHOTO_DIR = os.path.join(DATA_DIR, "photos") # 사진 저장을 위한 폴더 경로 추가
 
-for d in [DATA_DIR, ASSETS_DIR]:
+for d in [DATA_DIR, ASSETS_DIR, PHOTO_DIR]:
     if not os.path.exists(d):
         os.makedirs(d, exist_ok=True)
 
@@ -180,7 +181,6 @@ def convert_record_to_seconds(record_str):
     except:
         return None
 
-# DataFrame을 Excel 바이너리로 변환하는 함수
 def convert_df_to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -797,12 +797,55 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
 elif main_menu == "3. 대회 사진첩":
     st.title("📸 대회 사진첩")
     if not st.session_state.logged_in_user:
+        st.warning("로그인이 필요합니다.")
         st.stop()
+        
     if selected_event:
         st.subheader(f"📂 선택된 폴더: {selected_event}")
-        st.info(f"현재 '{selected_event}' 사진첩 폴더 안에 있습니다. 사진 업로드 및 관리 기능을 구현할 수 있는 공간입니다.")
+        
+        # 폴더별 사진 저장 경로 설정
+        folder_path = os.path.join(PHOTO_DIR, selected_event)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path, exist_ok=True)
+            
+        # 관리자 또는 로그인된 회원이 사진을 업로드할 수 있도록 설정
+        with st.form(f"upload_photo_form_{selected_event}", clear_on_submit=True):
+            st.markdown("### 📤 사진 업로드하기")
+            uploaded_files = st.file_uploader("대회 현장 사진을 선택하세요 (다중 선택 가능)", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+            submit_photos = st.form_submit_button("사진 업로드 완료")
+            
+            if submit_photos and uploaded_files:
+                for uploaded_file in uploaded_files:
+                    file_path = os.path.join(folder_path, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                st.success(f"총 {len(uploaded_files)}장의 사진이 성공적으로 업로드되었습니다!")
+                st.rerun()
+                
+        st.markdown("---")
+        st.markdown("### 🖼️ 사진 갤러리")
+        
+        # 저장된 사진 파일 불러오기
+        if os.path.exists(folder_path):
+            photo_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            
+            if photo_files:
+                # 3열 구조로 사진 배치
+                cols = st.columns(3)
+                for idx, photo_file in enumerate(photo_files):
+                    p_path = os.path.join(folder_path, photo_file)
+                    with cols[idx % 3]:
+                        st.image(p_path, caption=photo_file, use_container_width=True)
+                        # 관리자이거나 업로드한 본인인 경우 삭제 기능 제공 (여기서는 관리자 삭제 버튼 추가)
+                        if is_admin:
+                            if st.button("삭제", key=f"del_photo_{selected_event}_{photo_file}"):
+                                os.remove(p_path)
+                                st.success(f"'{photo_file}' 사진이 삭제되었습니다.")
+                                st.rerun()
+            else:
+                st.info("이 폴더에 업로드된 사진이 아직 없습니다. 위에서 사진을 업로드해 보세요!")
     else:
-        st.info("사이드바에서 폴더를 선택해주세요.")
+        st.info("사이드바에서 사진을 확인할 대회 폴더를 선택해주세요.")
 
 elif main_menu == "4. 건의사항":
     st.title("💡 건의사항")
