@@ -803,7 +803,6 @@ elif main_menu == "3. 대회 사진첩":
     if selected_event:
         st.subheader(f"📂 선택된 폴더: {selected_event}")
         
-        # 폴더별 사진 저장 경로 설정
         folder_path = os.path.join(PHOTO_DIR, selected_event)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path, exist_ok=True)
@@ -824,12 +823,13 @@ elif main_menu == "3. 대회 사진첩":
         st.markdown("---")
         st.markdown("### 🖼️ 사진 갤러리")
         
-        # 이미지 크기를 동일하게 맞춰주기 위한 CSS 스타일 적용
+        # [수정된 CSS] 모든 사진 크기를 완전히 고정(정사각형 형태, 꽉 채우기)
         st.markdown(
             """
             <style>
             div.stImage > img {
-                height: 220px !important;
+                width: 100% !important;
+                height: 250px !important;
                 object-fit: cover !important;
                 border-radius: 8px;
             }
