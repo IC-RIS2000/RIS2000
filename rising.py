@@ -516,7 +516,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             merged_view_df = display_records.copy()
             merged_view_df["초기록"] = merged_view_df["기록"].apply(convert_record_to_seconds)
             
-            # 기준표와 매칭하여 최상위권 기록 가져오기
             diff_list = []
             top_rank_list = []
             for idx, row in merged_view_df.iterrows():
@@ -533,9 +532,8 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 
                 if not bm_row.empty and sec is not None:
                     top_val = float(bm_row.iloc[0]["최상위권"])
-                    top_rank_list.append(top_val)
+                    top_rank_list.append(f"{top_val:.2f}초")
                     diff = sec - top_val
-                    # 시안성 좋은 차이값 포맷팅 (+면 뒤쳐짐, -면 앞섬/우수)
                     if diff > 0:
                         diff_list.append(f"+{diff:.2f}초 느림 ⚠️")
                     elif diff < 0:
@@ -543,14 +541,13 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     else:
                         diff_list.append("기준 동일 ✨")
                 else:
-                    top_rank_list.append(None)
-                    diff_list.append("기준 정보 없음 ➖")
+                    top_rank_list.append("기준 없음")
+                    diff_list.append("비교 불가 ➖")
             
-            merged_view_df["전국최상위권기준"] = top_rank_list
-            merged_view_df["최상위권과의 차이"] = diff_list
+            merged_view_df["전국최상위권"] = top_rank_list
+            merged_view_df["차이"] = diff_list
             
-            # 사용자에게 보여줄 컬럼 정돈
-            display_cols_order = ["입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록", "전국최상위권기준", "최상위권과의 차이"]
+            display_cols_order = ["입력 날짜", "측정 회차", "이름", "학년", "성별", "종목", "기록", "전국최상위권", "차이"]
             final_show_df = merged_view_df[[c for c in display_cols_order if c in merged_view_df.columns]]
             
             st.dataframe(final_show_df, use_container_width=True)
