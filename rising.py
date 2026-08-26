@@ -12,7 +12,7 @@ st.set_page_config(layout="wide", page_title="Rising Inline Club")
 # 2. 데이터 및 미디어 저장을 위한 로컬 폴더 경로 설정
 DATA_DIR = "club_data"
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")
-PHOTO_DIR = os.path.join(DATA_DIR, "photos") # 사진 저장을 위한 폴더 경로 추가
+PHOTO_DIR = os.path.join(DATA_DIR, "photos")
 
 for d in [DATA_DIR, ASSETS_DIR, PHOTO_DIR]:
     if not os.path.exists(d):
@@ -808,7 +808,6 @@ elif main_menu == "3. 대회 사진첩":
         if not os.path.exists(folder_path):
             os.makedirs(folder_path, exist_ok=True)
             
-        # 관리자 또는 로그인된 회원이 사진을 업로드할 수 있도록 설정
         with st.form(f"upload_photo_form_{selected_event}", clear_on_submit=True):
             st.markdown("### 📤 사진 업로드하기")
             uploaded_files = st.file_uploader("대회 현장 사진을 선택하세요 (다중 선택 가능)", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
@@ -825,18 +824,29 @@ elif main_menu == "3. 대회 사진첩":
         st.markdown("---")
         st.markdown("### 🖼️ 사진 갤러리")
         
-        # 저장된 사진 파일 불러오기
+        # 이미지 크기를 동일하게 맞춰주기 위한 CSS 스타일 적용
+        st.markdown(
+            """
+            <style>
+            div.stImage > img {
+                height: 220px !important;
+                object-fit: cover !important;
+                border-radius: 8px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        
         if os.path.exists(folder_path):
             photo_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
             
             if photo_files:
-                # 3열 구조로 사진 배치
                 cols = st.columns(3)
                 for idx, photo_file in enumerate(photo_files):
                     p_path = os.path.join(folder_path, photo_file)
                     with cols[idx % 3]:
                         st.image(p_path, caption=photo_file, use_container_width=True)
-                        # 관리자이거나 업로드한 본인인 경우 삭제 기능 제공 (여기서는 관리자 삭제 버튼 추가)
                         if is_admin:
                             if st.button("삭제", key=f"del_photo_{selected_event}_{photo_file}"):
                                 os.remove(p_path)
