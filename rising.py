@@ -98,9 +98,6 @@ if "suggestions" not in st.session_state:
 if "competitions" not in st.session_state:
     st.session_state.competitions = load_json(COMPETITIONS_FILE, [])
 
-if "selected_shop" not in st.session_state:
-    st.session_state.selected_shop = None
-
 default_users = {
     "admin": {
         "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
@@ -160,7 +157,7 @@ is_admin = False
 if current_id and current_id in st.session_state.users:
     is_admin = (st.session_state.users[current_id].get("role") == "admin")
 
-# 6. 사이드바 메인 메뉴 (라디오 버튼 키 매핑 적용)
+# 6. 사이드바 메인 메뉴
 st.sidebar.header("🏃 밴드 메뉴")
 menu_options = [
     "홈 (기본 영상)", 
@@ -176,7 +173,6 @@ if is_admin:
 if current_id:
     menu_options.append("🔐 개인정보 변경")
 
-# 라디오 버튼 상태 유지를 위해 key 매개변수 활용
 main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options, key="main_menu_radio")
 
 selected_event = None
@@ -215,9 +211,10 @@ if main_menu == "3. 대회 사진첩":
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 인라인 레이싱 샵 & 동영상")
 
-with st.sidebar.expander("🏎️ 인라인 레이싱 전문 샵"):
-    # st.link_button을 사용하여 새 창에서 안전하게 열리도록 유도 (동작 오류 원천 차단)
-    st.link_button("⚡ 스피드인라인 레이싱몰 바로가기", "http://www.speedinline.co.kr/", use_container_width=True)
+with st.sidebar.expander("🏎️ 인라인 전문 쇼핑몰"):
+    st.link_button("⚡ 프리웨이브 (인라인 전문)", "http://free-wave.co.kr/", use_container_width=True)
+    st.link_button("⚡ 지그타운 (레이싱/부품)", "https://zigtown.co.kr/", use_container_width=True)
+    st.link_button("⚡ EOC스포츠 (레이싱부츠)", "http://www.eoc-sports.com/", use_container_width=True)
 
 with st.sidebar.expander("🎥 인라인 강습 및 주행 영상"):
     st.markdown("- [인라인 초급 과정 강좌보기](https://www.youtube.com/watch?v=l7cuAsNMtTE)", unsafe_allow_html=True)
@@ -252,16 +249,29 @@ if main_menu == "홈 (기본 영상)":
     play_main_video()
 
 elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
-    st.title("🏁 전문 레이싱(스피드) 샵 대시보드")
-    st.markdown("외부 쇼핑몰 사이트들은 보안(X-Frame-Options) 정책상 내부 미리보기(iframe)가 차단되는 경우가 많습니다. 아래 버튼을 통해 **새 창에서 안전하게 접속**하실 수 있습니다.")
+    st.title("🏁 국내 주요 인라인 전문 쇼핑몰 안내")
+    st.markdown("동호인 및 선수들이 많이 이용하는 대중적인 인라인 레이싱·용품 전문 쇼핑몰 모음입니다. 원하시는 곳을 클릭하여 새 창에서 이용하세요.")
     st.markdown("---")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
         with st.container(border=True):
-            st.subheader("⚡ 스피드인라인 레이싱몰")
-            st.write("전문 스피드 인라인 스케이트, 부츠, 프레임, 부품 판매 쇼핑몰")
-            st.link_button("🚀 쇼핑몰 새 창으로 열기", "http://www.speedinline.co.kr/", use_container_width=True)
+            st.subheader("⚡ 프리웨이브")
+            st.write("각종 피트니스, 슬라럼, 전문 스케이트 및 보호장비")
+            st.link_button("프리웨이브 방문하기", "http://free-wave.co.kr/", use_container_width=True)
+            
+    with col2:
+        with st.container(border=True):
+            st.subheader("⚡ 지그타운")
+            st.write("레이싱 인라인 스케이트 및 휠·프레임 전문 쇼핑몰")
+            st.link_button("지그타운 방문하기", "https://zigtown.co.kr/", use_container_width=True)
+
+    with col3:
+        with st.container(border=True):
+            st.subheader("⚡ EOC스포츠")
+            st.write("풀카본 레이싱 부츠 및 전문 프레임 제작·판매")
+            st.link_button("EOC스포츠 방문하기", "http://www.eoc-sports.com/", use_container_width=True)
 
 elif main_menu == "1. 개인별 LAB Time Recorder":
     st.title("⏱️ 개인별 LAB Time Recorder")
