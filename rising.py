@@ -109,7 +109,6 @@ if "suggestions" not in st.session_state:
     st.session_state.suggestions = load_json(SUGGESTIONS_FILE, [])
 
 if "competitions" not in st.session_state:
-    # 구조: [{ "id": "...", "title": "...", "start_date": "...", "description": "...", "applicants": [{"id": "...", "name": "...", "grade": "...", "event": "..."}] }]
     st.session_state.competitions = load_json(COMPETITIONS_FILE, [])
 
 default_users = {
@@ -202,6 +201,32 @@ if main_menu == "3. 대회 사진첩":
     st.sidebar.subheader("📂 대회 폴더 선택")
     if st.session_state.event_folders:
         selected_event = st.sidebar.radio("이동할 사진첩을 선택하세요", st.session_state.event_folders)
+    
+    # 관리자인 경우 사이드바 메뉴 아래에 직접 폴더 생성 및 삭제 기능 제공
+    if is_admin:
+        with st.sidebar.expander("🛠️ 폴더 추가/삭제 관리"):
+            with st.form("add_folder_form", clear_on_submit=True):
+                new_folder_name = st.text_input("새 폴더 이름")
+                if st.form_submit_button("폴더 생성"):
+                    if new_folder_name.strip() and new_folder_name.strip() not in st.session_state.event_folders:
+                        st.session_state.event_folders.append(new_folder_name.strip())
+                        if new_folder_name.strip() not in st.session_state.competition_winners:
+                            st.session_state.competition_winners[new_folder_name.strip()] = []
+                        save_folders_to_disk()
+                        st.success("폴더가 생성되었습니다!")
+                        st.rerun()
+                    else:
+                        st.error("올바르거나 중복되지 않는 이름을 입력하세요.")
+            
+            if st.session_state.event_folders:
+                folder_to_delete = st.selectbox("삭제할 폴더 선택", st.session_state.event_folders, key="del_folder_sb")
+                if st.button("선택한 폴더 삭제"):
+                    st.session_state.event_folders.remove(folder_to_delete)
+                    if folder_to_delete in st.session_state.competition_winners:
+                        del st.session_state.competition_winners[folder_to_delete]
+                    save_folders_to_disk()
+                    st.success("폴더가 삭제되었습니다.")
+                    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔑 계정 관리")
@@ -607,7 +632,6 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
     st.write("대회명을 개설하고, 회원이 대회 참가 희망 신청을 하며, 실시간 참가자 명단을 관리 및 삭제할 수 있습니다.")
     st.write("---")
 
-    # 관리자 기능: 대회 개설 및 삭제
     if is_admin:
         with st.expander("🛠️ [관리자] 대회 개설 및 삭제 관리", expanded=False):
             with st.form("create_competition_form"):
@@ -690,13 +714,11 @@ elif main_menu == "2. 대회 참가 신청 및 명단":
                 applicants = comp.get("applicants", [])
                 if applicants:
                     app_df = pd.DataFrame(applicants)
-                    # 보기 좋게 컬럼명 매핑
                     app_df = app_df.rename(columns={"name": "이름", "grade": "학년", "event": "참가 종목"})
                     display_app_df = app_df[["이름", "학년", "참가 종목"]]
                     
                     st.dataframe(display_app_df, use_container_width=True)
                     
-                    # 관리자 또는 본인이 신청한 항목에 대해 개별 삭제 가능 기능
                     if is_admin or st.session_state.logged_in_user:
                         with st.expander(f"⚙️ '{comp['title']}' 참가자 명단 개별 관리"):
                             app_names_to_delete = st.selectbox(
@@ -719,7 +741,11 @@ elif main_menu == "3. 대회 사진첩":
     st.title("📸 대회 사진첩")
     if not st.session_state.logged_in_user:
         st.stop()
-    st.info("사진첩 메뉴입니다.")
+    if selected_event:
+        st.subheader(f"📂 선택된 폴더: {selected_event}")
+        st.info(f"현재 '{selected_event}' 사진첩 폴더 안에 있습니다. 사진 업로드 및 관리 기능을 구현할 수 있는 공간입니다.")
+    else:
+        st.info("사이드바에서 폴더를 선택해주세요.")
 
 elif main_menu == "4. 건의사항":
     st.title("💡 건의사항")
