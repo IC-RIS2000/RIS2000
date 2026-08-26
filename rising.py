@@ -287,7 +287,6 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             grade_options = ["유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
             selected_grade = st.selectbox("학년", grade_options)
             
-            # 학년에 해당하는 회원 딕셔너리 (ID: 이름) 생성
             grade_members = {uid: uinfo["name"] for uid, uinfo in st.session_state.users.items() if uinfo.get("grade") == selected_grade and uinfo.get("role") != "admin"}
             
             if grade_members:
@@ -326,7 +325,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             
             if uploaded_sheet:
                 st.image(uploaded_sheet, caption="업로드된 기록표", width=400)
-                st.write("### 📋 추출된 기록표 데이터 확인 및 수정 (개인별 정확한 학년 매칭)")
+                st.write("### 📋 추출된 기록표 데이터 확인 및 수정 (드롭다운으로 종목/학년 변경 가능)")
                 
                 raw_extracted_data = [
                     {"이름": "김문성", "종목": "300m", "기록": "30.05"},
@@ -366,7 +365,28 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     })
                 
                 sheet_date = st.date_input("📅 측정 날짜", datetime.now())
-                edited_df = st.data_editor(pd.DataFrame(processed_extracted_data), num_rows="dynamic", use_container_width=True)
+                
+                # 드롭다운(탑다운) 설정을 적용한 data_editor
+                grade_list_options = ["미등록회원", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
+                event_list_options = ["100m", "200m", "300m", "500m", "1,000m", "1,500m", "3,000m"]
+                
+                edited_df = st.data_editor(
+                    pd.DataFrame(processed_extracted_data), 
+                    num_rows="dynamic", 
+                    use_container_width=True,
+                    column_config={
+                        "학년": st.column_config.SelectboxColumn(
+                            "학년",
+                            options=grade_list_options,
+                            required=True
+                        ),
+                        "종목": st.column_config.SelectboxColumn(
+                            "종목",
+                            options=event_list_options,
+                            required=True
+                        )
+                    }
+                )
                 
                 if st.button("🚀 이 표의 모든 기록 일괄 등록", use_container_width=True):
                     added_count = 0
