@@ -50,11 +50,11 @@ def play_main_video():
         
         video_base64 = base64.b64encode(video_bytes).decode()
         
-        # 컬럼을 쓰지 않고 전체 폭에서 브라우저 세로 크기(vh)에 맞춰 꽉 차게 출력합니다.
+        # 세로 크기를 브라우저 화면 높이의 상당 부분(75vh)을 차지하도록 대폭 키웁니다.
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: center; align-items: center; width: 100%; height: 62vh; margin-top: 5px;">
-                <video controls autoplay muted loop style="height: 100%; max-height: 700px; width: auto; object-fit: contain; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 10px;">
+                <video controls autoplay muted loop style="height: 72vh; max-height: 800px; width: auto; object-fit: contain; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
                     <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
