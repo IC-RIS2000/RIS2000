@@ -101,9 +101,6 @@ if "competitions" not in st.session_state:
 if "selected_shop" not in st.session_state:
     st.session_state.selected_shop = None
 
-if "menu_selection" not in st.session_state:
-    st.session_state.menu_selection = "홈 (기본 영상)"
-
 default_users = {
     "admin": {
         "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
@@ -163,7 +160,7 @@ is_admin = False
 if current_id and current_id in st.session_state.users:
     is_admin = (st.session_state.users[current_id].get("role") == "admin")
 
-# 6. 사이드바 메인 메뉴
+# 6. 사이드바 메인 메뉴 (라디오 버튼 키 매핑 적용)
 st.sidebar.header("🏃 밴드 메뉴")
 menu_options = [
     "홈 (기본 영상)", 
@@ -179,12 +176,8 @@ if is_admin:
 if current_id:
     menu_options.append("🔐 개인정보 변경")
 
-if st.session_state.menu_selection not in menu_options:
-    st.session_state.menu_selection = "홈 (기본 영상)"
-
-current_menu_index = menu_options.index(st.session_state.menu_selection)
-main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options, index=current_menu_index)
-st.session_state.menu_selection = main_menu
+# 라디오 버튼 상태 유지를 위해 key 매개변수 활용
+main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options, key="main_menu_radio")
 
 selected_event = None
 if main_menu == "3. 대회 사진첩":
@@ -218,18 +211,13 @@ if main_menu == "3. 대회 사진첩":
                     st.success("폴더가 삭제되었습니다.")
                     st.rerun()
 
-# 6-1. 사이드바 레이싱 전문 샵 및 동영상 링크 섹션 (클릭 시 자동 메뉴 이동 처리)
+# 6-1. 사이드바 레이싱 전문 샵 및 동영상 링크 섹션
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 인라인 레이싱 샵 & 동영상")
 
 with st.sidebar.expander("🏎️ 인라인 레이싱 전문 샵"):
-    if st.button("⚡ 스피드인라인 레이싱몰", use_container_width=True):
-        st.session_state.selected_shop = {
-            "name": "스피드인라인 레이싱몰",
-            "url": "http://www.speedinline.co.kr/"
-        }
-        st.session_state.menu_selection = "5. 🏁 전문 레이싱 샵 (대시보드 보기)"
-        st.rerun()
+    # st.link_button을 사용하여 새 창에서 안전하게 열리도록 유도 (동작 오류 원천 차단)
+    st.link_button("⚡ 스피드인라인 레이싱몰 바로가기", "http://www.speedinline.co.kr/", use_container_width=True)
 
 with st.sidebar.expander("🎥 인라인 강습 및 주행 영상"):
     st.markdown("- [인라인 초급 과정 강좌보기](https://www.youtube.com/watch?v=l7cuAsNMtTE)", unsafe_allow_html=True)
@@ -265,40 +253,15 @@ if main_menu == "홈 (기본 영상)":
 
 elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
     st.title("🏁 전문 레이싱(스피드) 샵 대시보드")
-    st.markdown("왼쪽 버튼을 클릭하시거나 사이드바에서 샵을 선택하시면 대시보드 오른쪽 영역에 전문 샵 화면이 바로 표시됩니다.")
+    st.markdown("외부 쇼핑몰 사이트들은 보안(X-Frame-Options) 정책상 내부 미리보기(iframe)가 차단되는 경우가 많습니다. 아래 버튼을 통해 **새 창에서 안전하게 접속**하실 수 있습니다.")
     st.markdown("---")
     
-    col_left, col_right = st.columns([1, 2])
-    
-    with col_left:
-        st.subheader("🏁 레이싱 샵 선택")
-        if st.button("⚡ 스피드인라인 레이싱몰 보기", use_container_width=True):
-            st.session_state.selected_shop = {
-                "name": "스피드인라인 레이싱몰",
-                "url": "http://www.speedinline.co.kr/"
-            }
-            st.rerun()
-            
-    with col_right:
-        st.subheader("📌 샵 상세 화면")
-        if st.session_state.selected_shop:
-            shop_info = st.session_state.selected_shop
-            st.info(f"현재 선택된 샵: **{shop_info['name']}**")
-            try:
-                st.iframe(shop_info["url"], height=700)
-            except Exception:
-                st.warning("이 웹사이트는 보안 정책상 브라우저 내장(iframe)이 차단되어 있을 수 있습니다.")
-                st.markdown(f"[🔗 새 창에서 직접 열기]({shop_info['url']})")
-        else:
-            st.markdown(
-                """
-                <div style="padding: 50px; text-align: center; color: gray; border: 2px dashed #ccc; border-radius: 10px;">
-                    <h3>선택된 샵이 없습니다.</h3>
-                    <p>왼쪽 버튼에서 전문 레이싱 샵을 선택해 주세요.</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+    col1, col2 = st.columns(2)
+    with col1:
+        with st.container(border=True):
+            st.subheader("⚡ 스피드인라인 레이싱몰")
+            st.write("전문 스피드 인라인 스케이트, 부츠, 프레임, 부품 판매 쇼핑몰")
+            st.link_button("🚀 쇼핑몰 새 창으로 열기", "http://www.speedinline.co.kr/", use_container_width=True)
 
 elif main_menu == "1. 개인별 LAB Time Recorder":
     st.title("⏱️ 개인별 LAB Time Recorder")
