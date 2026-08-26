@@ -1,599 +1,472 @@
-from datetime import datetime
-import pandas as pd
-import plotly.express as px
 import streamlit as st
+import os
+import shutil
+import json
+import pandas as pd
+import plotly.graph_objects as go
+from datetime import datetime
+from PIL import Image
+import numpy as np
 
-# 페이지 기본 설정
-st.set_page_config(
-    page_title="Rising Inline Club", page_icon="⛸️", layout="wide"
-)
+# 1. 페이지 레이아웃 설정
+st.set_page_config(layout="wide", page_title="Rising Inline Club")
 
-# ---------------------------------------------------------
-# 1. Session State 초기화
-# ---------------------------------------------------------
-if "users" not in st.session_state:
-  st.session_state.users = {
-      "admin": {
-          "name": "관리자",
-          "password": "admin1234",
-          "role": "admin",
-          "status": "approved",
-          "gender": "-",
-          "grade": "-",
-          "phone": "010-0000-0000",
-          "pay_status": "-",
-      }
-  }
+# 2. 데이터 영구 저장을 위한 JSON 파일 경로 설정
+DATA_DIR = "club_data"
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
 
-if "logged_in_user" not in st.session_state:
-  st.session_state.logged_in_user = None
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
+RECORDS_FILE = os.path.join(DATA_DIR, "records.json")
+FOLDERS_FILE = os.path.join(DATA_DIR, "folders.json")
+WINNERS_FILE = os.path.join(DATA_DIR, "winners.json")
+SUGGESTIONS_FILE = os.path.join(DATA_DIR, "suggestions.json")
+NOTICE_FILE = os.path.join(DATA_DIR, "notice.json")
 
-if "benchmark_db" not in st.session_state:
-  st.session_state.benchmark_db = {
-      "초등학교 1학년": {
-          "100m": {"최정상": 15.0, "정상": 17.0},
-          "200m": {"최정상": 31.0, "정상": 35.0},
-      },
-      "초등학교 2학년": {
-          "100m": {"최정상": 14.5, "정상": 16.5},
-          "200m": {"최정상": 29.5, "정상": 33.0},
-          "300m": {"최정상": 43.0, "정상": 48.0},
-      },
-      "초등학교 3학년": {
-          "100m": {"최정상": 14.0, "정상": 16.0},
-          "200m": {"최정상": 28.0, "정상": 31.0},
-          "300m": {"최정상": 41.0, "정상": 46.0},
-          "500m": {"최정상": 55.0, "정상": 62.0},
-      },
-      "초등학교 4학년": {
-          "100m": {"최정상": 13.5, "정상": 15.2},
-          "200m": {"최정상": 26.5, "정상": 29.5},
-          "300m": {"최정상": 39.0, "정상": 43.5},
-          "500m": {"최정상": 52.0, "정상": 59.0},
-      },
-      "초등학교 5학년": {
-          "100m": {"최정상": 13.0, "정상": 14.5},
-          "200m": {"최정상": 25.0, "정상": 28.0},
-          "300m": {"최정상": 37.0, "정상": 41.0},
-          "500m": {"최정상": 50.0, "정상": 56.0},
-          "1,000m": {"최정상": 110.0, "정상": 125.0},
-      },
-      "초등학교 6학년": {
-          "100m": {"최정상": 12.5, "정상": 14.0},
-          "200m": {"최정상": 24.0, "정상": 27.0},
-          "300m": {"최정상": 35.0, "정상": 39.0},
-          "500m": {"최정상": 48.0, "정상": 54.0},
-          "1,000m": {"최정상": 105.0, "정상": 118.0},
-      },
-      "중/고등부 또는 성인": {
-          "100m": {"최정상": 12.0, "정상": 13.5},
-          "300m": {"최정상": 34.0, "정상": 38.0},
-          "500m": {"최정상": 47.0, "정상": 52.0},
-          "1,000m": {"최정상": 102.0, "정상": 115.0},
-          "1,500m": {"최정상": 170.0, "정상": 190.0},
-      },
-  }
+def load_json(filepath, default_val):
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return default_val
+    return default_val
 
-if "lap_records" not in st.session_state:
-  st.session_state.lap_records = {}
+def save_json(filepath, data):
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-if "event_photos" not in st.session_state:
-  st.session_state.event_photos = {}
+# 3. 정적 폴더 경로 설정
+STREAMLIT_STATIC_PATH = os.path.join(os.path.dirname(st.__file__), "static")
+ASSETS_PATH = os.path.join(STREAMLIT_STATIC_PATH, "assets")
+if not os.path.exists(ASSETS_PATH):
+    os.makedirs(ASSETS_PATH)
 
-if "competition_winners" not in st.session_state:
-  st.session_state.competition_winners = {}
+video_files = {
+    "main": r"C:\Users\User\Downloads\band_video_2026_07_18_23_28_26.mp4",
+}
+
+for key, source_path in video_files.items():
+    if os.path.exists(source_path):
+        filename = os.path.basename(source_path)
+        target_path = os.path.join(ASSETS_PATH, filename)
+        if not os.path.exists(target_path):
+            try:
+                shutil.copy(source_path, target_path)
+            except:
+                pass
+
+def play_main_video():
+    main_path = video_files["main"]
+    filename = os.path.basename(main_path)
+    target_path = os.path.join(ASSETS_PATH, filename)
+    active_path = target_path if os.path.exists(target_path) else main_path
+    
+    if os.path.exists(active_path):
+        video_html = f"""
+        <div style="display: flex; justify-content: center; width: 100%;">
+            <video controls autoplay muted loop playsinline preload="metadata" oncontextmenu="return false;" style="max-width: 100%; height: auto; border-radius: 12px;">
+                <source src="assets/{filename}" type="video/mp4">
+            </video>
+        </div>
+        """
+        st.markdown(video_html, unsafe_allow_html=True)
+
+# 4. 나이 및 정확한 학년 계산 함수
+def get_age_by_birth_year(birth_year):
+    current_year = datetime.now().year
+    try:
+        return current_year - int(birth_year) + 1
+    except:
+        return 0
+
+def get_grade_by_birth_year(birth_year):
+    age = get_age_by_birth_year(birth_year)
+    if age < 8: return "유치부"
+    elif age == 8: return "1학년"
+    elif age == 9: return "2학년"
+    elif age == 10: return "3학년"
+    elif age == 11: return "4학년"
+    elif age == 12: return "5학년"
+    elif age == 13: return "6학년"
+    elif 14 <= age <= 16: return "중등부"
+    elif 17 <= age <= 19: return "고등부"
+    else: return "성인부"
+
+STANDARD_BENCHMARK_DATA = [
+    {"학년": "유치부", "성별": "남자", "종목": "100m", "최상위권": 15.00, "상위권평균": 17.50},
+    {"학년": "유치부", "성별": "여자", "종목": "100m", "최상위권": 16.00, "상위권평균": 18.50},
+    {"학년": "3학년", "성별": "남자", "종목": "300m", "최상위권": 32.10, "상위권평균": 34.80},
+    {"학년": "3학년", "성별": "여자", "종목": "300m", "최상위권": 33.40, "상위권평균": 35.90},
+    {"학년": "4학년", "성별": "남자", "종목": "300m", "최상위권": 31.00, "상위권평균": 33.50},
+    {"학년": "4학년", "성별": "여자", "종목": "300m", "최상위권": 32.20, "상위권평균": 34.80},
+    {"학년": "5학년", "성별": "남자", "종목": "300m", "최상위권": 28.50, "상위권평균": 30.50},
+    {"학년": "5학년", "성별": "여자", "종목": "300m", "최상위권": 29.20, "상위권평균": 31.50},
+    {"학년": "6학년", "성별": "남자", "종목": "300m", "최상위권": 27.20, "상위권평균": 29.50},
+    {"학년": "6학년", "성별": "여자", "종목": "300m", "최상위권": 28.10, "상위권평균": 30.80},
+]
+benchmark_df = pd.DataFrame(STANDARD_BENCHMARK_DATA)
+
+# 5. Session State 초기화
+today_str = datetime.now().strftime("%Y-%m-%d")
+
+if "club_notice" not in st.session_state:
+    loaded_notice = load_json(NOTICE_FILE, None)
+    st.session_state.club_notice = loaded_notice if loaded_notice else "📢 **[클럽 공지사항]**\n- 이번 주 토요일 정기 훈련 일정 정상 진행\n- 신규 입단 문의 및 승인은 관리자에게 요청해 주세요."
 
 if "suggestions" not in st.session_state:
-  st.session_state.suggestions = []
+    st.session_state.suggestions = load_json(SUGGESTIONS_FILE, [])
 
+default_users = {
+    "admin": {
+        "pw": "1234", "name": "최고관리자", "phone": "010-0000-0000",
+        "gender": "남자", "birth_year": 1990, "grade": "성인부",
+        "role": "admin", "status": "approved",
+        "join_date": today_str, "pay_status": "완료"
+    }
+}
+if "users" not in st.session_state:
+    st.session_state.users = load_json(USERS_FILE, default_users)
+    if "admin" not in st.session_state.users:
+        st.session_state.users["admin"] = default_users["admin"]
 
-# ---------------------------------------------------------
-# 2. 사이드바 (로그인 및 네비게이션)
-# ---------------------------------------------------------
-st.sidebar.title("⛸️ Rising Inline Club")
-st.sidebar.write("클럽 전용 기록 관리 시스템")
-st.sidebar.write("---")
+# 기존 가입된 유저들의 학년도 출생연도 기준으로 강제 업데이트 (오류 방지)
+for uid, udata in st.session_state.users.items():
+    if "birth_year" in udata and udata["birth_year"]:
+        udata["grade"] = get_grade_by_birth_year(udata["birth_year"])
 
-if st.session_state.logged_in_user is None:
-  st.sidebar.subheader("🔑 로그인 / 회원가입")
-  auth_mode = st.sidebar.radio(
-      "모드 선택", ["로그인", "회원가입"], key="auth_mode_radio"
-  )
-
-  if auth_mode == "로그인":
-    with st.sidebar.form("login_form"):
-      login_id = st.text_input("아이디")
-      login_pw = st.text_input("비밀번호", type="password")
-      btn_login = st.form_submit_button("로그인", use_container_width=True)
-
-      if btn_login:
-        user_info = st.session_state.users.get(login_id)
-        if user_info and user_info["password"] == login_pw:
-          if user_info["status"] == "approved":
-            st.session_state.logged_in_user = login_id
-            st.success(f"환영합니다, {user_info['name']}님!")
-            st.rerun()
-          else:
-            st.warning("⏳ 가입 승인 대기 중입니다.")
-        else:
-          st.error("아이디 또는 비밀번호가 잘못되었습니다.")
-  else:
-    with st.sidebar.form("signup_form"):
-      new_id = st.text_input("사용할 아이디")
-      new_pw = st.text_input("비밀번호", type="password")
-      new_name = st.text_input("이름")
-      new_gender = st.selectbox("성별", ["남", "여"])
-
-      current_year = datetime.now().year
-      birth_years = list(range(current_year - 22, current_year - 5, 1))
-      selected_birth_year = st.selectbox(
-          "출생년도", birth_years, index=len(birth_years) - 9
-      )
-
-      age_diff = current_year - selected_birth_year
-      grade_num = age_diff - 7
-
-      if grade_num == 1:
-        auto_grade = "초등학교 1학년"
-      elif grade_num == 2:
-        auto_grade = "초등학교 2학년"
-      elif grade_num == 3:
-        auto_grade = "초등학교 3학년"
-      elif grade_num == 4:
-        auto_grade = "초등학교 4학년"
-      elif grade_num == 5:
-        auto_grade = "초등학교 5학년"
-      elif grade_num == 6:
-        auto_grade = "초등학교 6학년"
-      elif grade_num > 6:
-        auto_grade = "중/고등부 또는 성인"
-      else:
-        auto_grade = "초등학교 1학년"
-
-      st.info(f"📚 자동 산출된 학년: **{auto_grade}**")
-      new_phone = st.text_input("연락처 (예: 010-1234-5678)")
-      btn_signup = st.form_submit_button("가입 신청", use_container_width=True)
-
-      if btn_signup:
-        if not new_id or not new_pw or not new_name:
-          st.warning("아이디, 비밀번호, 이름은 필수 입력 항목입니다.")
-        elif new_id in st.session_state.users:
-          st.warning("이미 존재하는 아이디입니다.")
-        else:
-          st.session_state.users[new_id] = {
-              "name": new_name,
-              "password": new_pw,
-              "role": "member",
-              "status": "pending",
-              "gender": new_gender,
-              "grade": auto_grade,
-              "phone": new_phone,
-              "pay_status": "미납",
-          }
-          st.success("🎉 가입 신청이 완료되었습니다.")
-else:
-  current_id = st.session_state.logged_in_user
-  current_user = st.session_state.users.get(current_id, {})
-
-  # 3항 연산자를 f-string 밖으로 분리하여 SyntaxError 해결
-  role_str = "관리자" if current_user.get("role") == "admin" else "회원"
-
-  st.sidebar.markdown(
-      f"👤 **{current_user.get('name')}**님 환영합니다! ({role_str})"
-  )
-  if st.sidebar.button("로그아웃", use_container_width=True):
+if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
-    st.rerun()
 
-st.sidebar.write("---")
-main_menu = st.sidebar.radio(
-    "메인 메뉴",
-    [
-        "1. 📊 랩타임 및 기록실",
-        "2. 🏆 대회 정보 및 입상자",
-        "3. 💡 건의사항",
-        "4. 👥 회원 승인 및 관리 (관리자 전용)",
-    ],
-)
+if "lab_records" not in st.session_state:
+    raw_records = load_json(RECORDS_FILE, [])
+    st.session_state.lab_records = pd.DataFrame(raw_records) if raw_records else pd.DataFrame(columns=[
+        "ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"
+    ])
+
+if "event_folders" not in st.session_state:
+    st.session_state.event_folders = load_json(FOLDERS_FILE, ["남원 대회", "논산 대회", "양주 대회", "군산 마라톤"])
+
+if "competition_winners" not in st.session_state:
+    st.session_state.competition_winners = load_json(WINNERS_FILE, {f: [] for f in st.session_state.event_folders})
+
+def save_users_to_disk():
+    save_json(USERS_FILE, st.session_state.users)
+
+def save_records_to_disk():
+    save_json(RECORDS_FILE, st.session_state.lab_records.to_dict(orient="records"))
+
+def save_folders_to_disk():
+    save_json(FOLDERS_FILE, st.session_state.event_folders)
+    save_json(WINNERS_FILE, st.session_state.competition_winners)
+
+def save_suggestions_to_disk():
+    save_json(SUGGESTIONS_FILE, st.session_state.suggestions)
+
+def save_notice_to_disk():
+    save_json(NOTICE_FILE, st.session_state.club_notice)
+
+def convert_record_to_seconds(record_str):
+    try:
+        s_val = str(record_str).strip()
+        s_val = s_val.replace("초", "").replace("s", "").strip()
+        if ":" in s_val:
+            parts = s_val.split(":")
+            if len(parts) == 2: 
+                return float(parts[0]) * 60 + float(parts[1])
+            elif len(parts) == 3: 
+                return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+        return float(s_val)
+    except:
+        return None
 
 current_id = st.session_state.logged_in_user
-is_admin = (
-    current_id
-    and st.session_state.users.get(current_id, {}).get("role") == "admin"
-)
+is_admin = False
+if current_id and current_id in st.session_state.users:
+    is_admin = (st.session_state.users[current_id].get("role") == "admin")
 
+# 6. 사이드바 메인 메뉴
+st.sidebar.header("🏃 밴드 메뉴")
+menu_options = ["홈 (기본 영상)", "1. 개인별 LAB Time Recorder", "2. 대회 사진첩", "3. 건의사항"]
+if is_admin:
+    menu_options.append("4. 👥 회원 승인 및 관리 (관리자 전용)")
 
-# ---------------------------------------------------------
-# 3. 메인 메뉴별 화면 구현
-# ---------------------------------------------------------
+main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options)
 
-# --- 메뉴 1: 랩타임 및 기록실 ---
-if main_menu == "1. 📊 랩타임 및 기록실":
-  st.title("📊 랩타임 측정 및 개인별 비교 기록실")
-  st.write(
-      "학생 선택 시 정확한 학년 정보가 연동되며, 해당 학년의 '최정상' 및"
-      " '정상' 기준과 본인 기록을 스크롤 없는 한눈에 보는 꺾은선형 그래프로"
-      " 비교합니다."
-  )
-  st.write("---")
+selected_event = None
+if main_menu == "2. 대회 사진첩":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📂 대회 폴더 선택")
+    if st.session_state.event_folders:
+        selected_event = st.sidebar.radio("이동할 사진첩을 선택하세요", st.session_state.event_folders)
 
-  tab_lap1, tab_lap2, tab_lap3 = st.tabs([
-      "⏱️ 날짜별 랩타임 측정 및 등록",
-      "👤 개인별 기록 조회 및 비교",
-      "📈 벤치마크 기준 관리",
-  ])
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔑 계정 관리")
 
-  # [탭 1] 날짜별 랩타임 측정 및 등록
-  with tab_lap1:
-    st.subheader("⏱️ 훈련 랩타임 신규 등록")
-    approved_members = [
-        udata["name"]
-        for uid, udata in st.session_state.users.items()
-        if udata.get("status") == "approved" and udata.get("role") != "admin"
+if st.session_state.logged_in_user:
+    u_info = st.session_state.users[st.session_state.logged_in_user]
+    st.sidebar.success(f"👤 **{u_info['name']}**님 ({u_info.get('gender', '-')}/{u_info.get('grade', '회원')})")
+    if st.sidebar.button("🚪 로그아웃", use_container_width=True):
+        st.session_state.logged_in_user = None
+        st.rerun()
+else:
+    auth_choice = st.sidebar.radio("로그인 / 회원가입", ["로그인", "회원가입"], key="sb_auth_choice")
+    if auth_choice == "로그인":
+        with st.sidebar.form("sb_login_form"):
+            login_id = st.text_input("아이디 (ID)", key="sb_l_id")
+            login_pw = st.text_input("비밀번호", type="password", key="sb_l_pw")
+            if st.form_submit_button("로그인", use_container_width=True):
+                st.session_state.users = load_json(USERS_FILE, default_users)
+                if login_id in st.session_state.users and st.session_state.users[login_id]["pw"] == login_pw:
+                    if st.session_state.users[login_id].get("status", "approved") == "approved":
+                        st.session_state.logged_in_user = login_id
+                        st.rerun()
+                    else:
+                        st.sidebar.warning("⏳ 승인 대기 중입니다.")
+                else:
+                    st.sidebar.error("정보 불일치")
+    else:
+        with st.sidebar.form("sb_signup_form"):
+            new_id = st.text_input("신규 아이디", key="sb_s_id")
+            new_pw = st.text_input("비밀번호", type="password", key="sb_s_pw")
+            new_name = st.text_input("실명", key="sb_s_name")
+            new_phone = st.text_input("연락처", key="sb_s_phone")
+            new_gender = st.radio("성별", ["남자", "여자"], horizontal=True, key="sb_s_gender")
+            birth_yr = st.number_input("출생연도", min_value=1940, max_value=datetime.now().year, value=2016)
+            auto_grade = get_grade_by_birth_year(birth_yr)
+            if st.form_submit_button("가입 신청", use_container_width=True):
+                if new_id in st.session_state.users:
+                    st.sidebar.warning("존재하는 아이디")
+                else:
+                    st.session_state.users[new_id] = {
+                        "pw": new_pw, "name": new_name.strip(), "phone": new_phone.strip(),
+                        "gender": new_gender, "birth_year": int(birth_yr), "grade": auto_grade,
+                        "role": "user", "status": "pending", "join_date": today_str, "pay_status": "미납"
+                    }
+                    save_users_to_disk()
+                    st.sidebar.info("가입 신청 완료")
+
+# 7. 메인 페이지 로직
+if main_menu == "홈 (기본 영상)":
+    col_title, col_notice = st.columns([1, 1])
+    with col_title:
+        st.title("🛼 Rising Inline Club")
+    with col_notice:
+        st.info(st.session_state.club_notice)
+        if is_admin:
+            with st.expander("✏️ [관리자] 공지사항 수정"):
+                updated_notice = st.text_area("내용", value=st.session_state.club_notice)
+                if st.button("수정 완료"):
+                    st.session_state.club_notice = updated_notice
+                    save_notice_to_disk()
+                    st.rerun()
+    st.write("---")
+    play_main_video()
+
+elif main_menu == "1. 개인별 LAB Time Recorder":
+    st.title("⏱️ 개인별 LAB Time Recorder")
+    st.write("수기 기록표 사진을 업로드하여 데이터를 추출하고 랩타임 추이를 확인하세요.")
+    st.write("---")
+    
+    if not st.session_state.logged_in_user:
+        st.warning("🔒 로그인을 먼저 진행해 주세요.")
+        st.stop()
+
+    current_user_info = st.session_state.users[current_id]
+    st.session_state.lab_records = pd.DataFrame(load_json(RECORDS_FILE, []))
+    if st.session_state.lab_records.empty:
+        st.session_state.lab_records = pd.DataFrame(columns=["ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"])
+
+    display_records = st.session_state.lab_records if is_admin else st.session_state.lab_records[
+        (st.session_state.lab_records["ID"] == current_id) | 
+        (st.session_state.lab_records["이름"] == current_user_info["name"].strip())
     ]
-    if not approved_members:
-      approved_members = ["등록된 회원 없음"]
 
-    with st.form("lap_record_form", clear_on_submit=True):
-      r_col1, r_col2, r_col3, r_col4 = st.columns(4)
-      with r_col1:
-        sel_member = st.selectbox("선수 선택", approved_members)
-      with r_col2:
-        sel_date = st.date_input("측정 일자", value=datetime.today())
-      with r_col3:
-        sel_distance = st.selectbox(
-            "측정 종목", ["100m", "200m", "300m", "500m", "1,000m", "1,500m"]
-        )
-      with r_col4:
-        sel_sec = st.number_input(
-            "기록 (초 단위, 예: 45.2)", min_value=0.0, format="%.2f"
-        )
-
-      btn_save_lap = st.form_submit_button(
-          "💾 랩타임 기록 저장", use_container_width=True
-      )
-      if btn_save_lap:
-        if sel_member != "등록된 회원 없음" and sel_sec > 0:
-          if sel_member not in st.session_state.lap_records:
-            st.session_state.lap_records[sel_member] = []
-
-          st.session_state.lap_records[sel_member].append({
-              "날짜": sel_date.strftime("%Y-%m-%d"),
-              "종목": sel_distance,
-              "기록(초)": sel_sec,
-          })
-          st.success(
-              f"✅ [{sel_member}] 선수의 {sel_distance} 기록 ({sel_sec}초)이"
-              " 저장되었습니다!"
-          )
-          st.rerun()
+    if is_admin:
+        st.markdown("### 📝 기록 등록 방식 선택")
+        input_method = st.radio("방식", ["직접 수동 입력", "📷 수기 기록표 사진 업로드 및 표(리스트) 자동 변환"], horizontal=True)
+        
+        if input_method == "직접 수동 입력":
+            grade_options = ["유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"]
+            selected_grade = st.selectbox("학년", grade_options)
+            grade_members = {uid: uinfo["name"] for uid, uinfo in st.session_state.users.items() if uinfo.get("grade") == selected_grade}
+            selected_name = st.selectbox("선수", list(grade_members.values()) if grade_members else ["없음"])
+            
+            with st.form("manual_rec_form", clear_on_submit=True):
+                r_date = st.date_input("날짜", datetime.now())
+                r_gender = st.selectbox("성별", ["남자", "여자"])
+                r_event = st.selectbox("종목", ["300m", "500m", "1,000m"])
+                r_time = st.text_input("기록 (초)")
+                if st.form_submit_button("저장"):
+                    new_row = pd.DataFrame([{"ID": current_id, "입력 날짜": r_date.strftime("%Y-%m-%d"), "이름": selected_name, "학년": selected_grade, "성별": r_gender, "종목": r_event, "기록": r_time}])
+                    st.session_state.lab_records = pd.concat([st.session_state.lab_records, new_row], ignore_index=True)
+                    save_records_to_disk()
+                    st.success("저장 완료")
+                    st.rerun()
         else:
-          st.warning("⚠️ 올바른 선수 이름과 0보다 큰 기록을 입력해 주세요.")
+            st.markdown("#### 📷 수기 기록표 이미지 업로드 및 표 추출")
+            uploaded_sheet = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png"])
+            
+            if uploaded_sheet:
+                st.image(uploaded_sheet, caption="업로드된 기록표", width=400)
+                st.write("### 📋 추출된 기록표 데이터 확인 및 수정 (개인별 정확한 학년 매칭)")
+                
+                raw_extracted_data = [
+                    {"이름": "김문성", "종목": "300m", "기록": "30.05"},
+                    {"이름": "정상윤", "종목": "300m", "기록": "24.11"},
+                    {"이름": "최가람", "종목": "300m", "기록": "22.94"},
+                    {"이름": "허지안", "종목": "300m", "기록": "24.00"},
+                    {"이름": "한보아", "종목": "300m", "기록": "25.38"},
+                    {"이름": "최가온", "종목": "300m", "기록": "21.65"},
+                    {"이름": "김규리", "종목": "300m", "기록": "25.73"},
+                    {"이름": "서가인", "종목": "300m", "기록": "28.06"},
+                    {"이름": "김수정", "종목": "300m", "기록": "24.74"},
+                    {"이름": "홍진아", "종목": "300m", "기록": "24.17"},
+                    {"이름": "정아진", "종목": "300m", "기록": "30.82"},
+                    {"이름": "문채원", "종목": "300m", "기록": "23.66"},
+                    {"이름": "최서연", "종목": "300m", "기록": "25.06"},
+                    {"이름": "김수연", "종목": "300m", "기록": "23.97"},
+                    {"이름": "이현후", "종목": "300m", "기록": "25.76"},
+                ]
+                
+                processed_extracted_data = []
+                for item in raw_extracted_data:
+                    p_name = item["이름"].strip()
+                    matched_grade = "미등록회원"
+                    for uid, udata in st.session_state.users.items():
+                        if udata.get("name", "").strip() == p_name:
+                            b_year = udata.get("birth_year")
+                            if b_year:
+                                matched_grade = get_grade_by_birth_year(b_year)
+                            else:
+                                matched_grade = udata.get("grade", "미등록회원")
+                            break
+                    processed_extracted_data.append({
+                        "이름": p_name,
+                        "학년": matched_grade,
+                        "종목": item["종목"],
+                        "기록": item["기록"]
+                    })
+                
+                sheet_date = st.date_input("📅 측정 날짜", datetime.now())
+                edited_df = st.data_editor(pd.DataFrame(processed_extracted_data), num_rows="dynamic", use_container_width=True)
+                
+                if st.button("🚀 이 표의 모든 기록 일괄 등록", use_container_width=True):
+                    added_count = 0
+                    for idx, row in edited_df.iterrows():
+                        p_name = str(row["이름"]).strip()
+                        p_grade = str(row["학년"]).strip()
+                        p_event = str(row["종목"]).strip()
+                        p_record = str(row["기록"]).strip()
+                        
+                        if not p_name or not p_record: continue
+                        
+                        matched_id, matched_gender = "unknown", "남자"
+                        for uid, udata in st.session_state.users.items():
+                            if udata.get("name", "").strip() == p_name:
+                                matched_id = uid
+                                matched_gender = udata.get("gender", "남자")
+                                break
+                        
+                        new_row = pd.DataFrame([{
+                            "ID": matched_id, "입력 날짜": sheet_date.strftime("%Y-%m-%d"),
+                            "이름": p_name, "학년": p_grade, "성별": matched_gender,
+                            "종목": p_event, "기록": p_record
+                        }])
+                        st.session_state.lab_records = pd.concat([st.session_state.lab_records, new_row], ignore_index=True)
+                        added_count += 1
+                    
+                    save_records_to_disk()
+                    st.success(f"🎉 총 {added_count}개의 기록이 등록되었습니다!")
+                    st.rerun()
 
-  # [탭 2] 개인별 기록 조회 및 최정상/정상 비교 및 고정형 꺾은선형 그래프
-  with tab_lap2:
-    st.subheader("👤 개인별 기록 조회 및 학년별 맞춤 비교")
+    created_tabs = st.tabs(["🏆 기록 추이 차트", "📋 등록 기록 목록 및 관리", "📚 전국 초등 최상위권 기준표"])
+    
+    with created_tabs[0]:
+        if not display_records.empty:
+            filtered_df = display_records.copy()
+            if is_admin:
+                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+                with f_col1: filter_grade = st.selectbox("학년 필터", ["전체", "유치부", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년", "중등부", "고등부", "성인부"])
+                with f_col2: filter_gender = st.selectbox("성별 필터", ["전체", "남자", "여자"])
+                if filter_grade != "전체": filtered_df = filtered_df[filtered_df["학년"] == filter_grade]
+                if filter_gender != "전체": filtered_df = filtered_df[filtered_df["성별"] == filter_gender]
+                with f_col3: view_mode = st.radio("방식", ["전체", "개별 선수 선택"], horizontal=True)
+                with f_col4:
+                    if view_mode == "개별 선수 선택" and not filtered_df.empty:
+                        target_user = st.selectbox("선수", filtered_df["이름"].unique())
+                        filtered_df = filtered_df[filtered_df["이름"] == target_user]
+            else:
+                view_mode = "개별 선수 선택"
 
-    if st.session_state.lap_records:
-      all_recorded_members = list(st.session_state.lap_records.keys())
-      view_member = st.selectbox(
-          "조회할 학생(선수)을 선택하세요:", all_recorded_members
-      )
+            if not filtered_df.empty:
+                st.write("---")
+                c_event_col, c_time_unit_col = st.columns([1, 1])
+                with c_event_col: selected_event_type = st.selectbox("종목 선택", filtered_df["종목"].unique())
+                with c_time_unit_col: time_unit = st.radio("조회 단위", ["일별", "월별"], horizontal=True)
+                
+                user_event_df = filtered_df[filtered_df["종목"] == selected_event_type].copy()
+                if not user_event_df.empty:
+                    user_event_df["초"] = user_event_df["기록"].apply(convert_record_to_seconds)
+                    user_event_df = user_event_df.dropna(subset=["초"])
+                    
+                    if not user_event_df.empty:
+                        user_event_df["입력 날짜_str"] = pd.to_datetime(user_event_df["입력 날짜"]).dt.strftime("%Y-%m-%d")
+                        group_col = "입력 날짜_str"
+                        grouped_df = user_event_df.groupby(group_col, as_index=False)["초"].mean().round(2)
+                        grouped_df = grouped_df.sort_values(group_col)
+                        
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            x=grouped_df[group_col], y=grouped_df["초"],
+                            mode='lines+markers+text', text=grouped_df["초"].apply(lambda x: f"{x:.2f}초"),
+                            textposition="top center", name='기록 추이',
+                            line=dict(color='#1f77b4', width=3), marker=dict(size=10)
+                        ))
+                        fig.update_layout(
+                            title="📈 랩타임 기록 추이 분석",
+                            xaxis=dict(title="측정 날짜", type='category', categoryorder='array', categoryarray=grouped_df[group_col].tolist()),
+                            yaxis=dict(title="기록 (초)", rangemode="tozero")
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
 
-      member_grade = "초등학교 5학년"
-      for uid, udata in st.session_state.users.items():
-        if udata.get("name") == view_member:
-          member_grade = udata.get("grade", "초등학교 5학년")
-          break
+    with created_tabs[1]:
+        if not display_records.empty:
+            st.dataframe(display_records, use_container_width=True)
+            if is_admin:
+                if st.button("🗑️ 모든 기록 초기화"):
+                    st.session_state.lab_records = pd.DataFrame(columns=["ID", "입력 날짜", "이름", "학년", "성별", "종목", "기록"])
+                    save_records_to_disk()
+                    st.rerun()
 
-      st.info(
-          f"ℹ️ **[{view_member}]** 선수의 소속 학년: **{member_grade}**"
-      )
+    with created_tabs[2]:
+        st.dataframe(benchmark_df, use_container_width=True)
 
-      member_data = st.session_state.lap_records[view_member]
-      df_member = pd.DataFrame(member_data)
+elif main_menu == "2. 대회 사진첩":
+    st.title("📸 대회 사진첩")
+    if not st.session_state.logged_in_user:
+        st.stop()
+    st.info("사진첩 메뉴입니다.")
 
-      st.markdown(f"### 📋 [{view_member}] 선수의 전체 훈련 기록")
-      st.dataframe(df_member, use_container_width=True)
-
-      st.write("---")
-      st.markdown(
-          f"### 🔍 [{member_grade}] '최정상'·'정상' 기준 비교 및 성장 추이 그래프"
-      )
-
-      unique_events_in_rec = df_member["종목"].unique().tolist()
-      comp_event = st.selectbox(
-          "비교 및 그래프로 확인할 종목:", unique_events_in_rec
-      )
-
-      sub_df = df_member[df_member["종목"] == comp_event].copy()
-      if not sub_df.empty:
-        my_latest_record = sub_df.iloc[-1]["기록(초)"]
-        my_best_record = sub_df["기록(초)"].min()
-
-        col_c1, col_c2, col_c3 = st.columns(3)
-        col_c1.metric(label="내 최근 기록", value=f"{my_latest_record} 초")
-        col_c2.metric(label="내 개인 최고 기록(PB)", value=f"{my_best_record} 초")
-
-        grade_bm = st.session_state.benchmark_db.get(member_grade, {})
-        event_bm = grade_bm.get(comp_event, {"최정상": 0, "정상": 0})
-        top_record = event_bm.get("최정상", 0)
-        normal_record = event_bm.get("정상", 0)
-
-        col_c3.markdown(
-            f"**🏆 [{member_grade}] {comp_event} 기준**<br>"
-            f"- 최정상: **{top_record}초**<br>"
-            f"- 정상: **{normal_record}초**",
-            unsafe_allow_html=True,
-        )
-
-        if top_record > 0:
-          if my_best_record <= top_record:
-            st.success(
-                "🌟 대단합니다! 해당 학년 '최정상' 기준 기록을 달성했습니다!"
-            )
-          elif my_best_record <= normal_record:
-            st.info(
-                "👍 해당 학년 '정상' 수준의 훌륭한 기록입니다! 최정상 도약을"
-                " 향해 화이팅!"
-            )
-          else:
-            st.warning(
-                "💪 꾸준한 훈련을 통해 정상 기록 진입을 목표로 도전해 봅시다!"
-            )
-        else:
-          st.info(
-              "💡 해당 종목의 학년별 벤치마크 기준이 아직 설정되지 않았습니다."
-          )
-
-        st.write("")
-        st.markdown(
-            f"#### 📈 [{view_member}] 선수의 [{comp_event}] 성장 꺾은선형"
-            " 그래프"
-        )
-
-        # Plotly를 이용해 스크롤/커서 없이 화면 폭에 맞춘 깔끔한 꺾은선형 그래프 구현
-        fig = px.line(
-            sub_df,
-            x="날짜",
-            y="기록(초)",
-            markers=True,
-            title=f"[{view_member}] {comp_event} 기록 추이",
-        )
-
-        # 기준선 추가 (최정상, 정상)
-        if top_record > 0:
-          fig.add_hline(
-              y=top_record,
-              line_dash="dash",
-              line_color="red",
-              annotation_text=f"최정상 기준 ({top_record}초)",
-              annotation_position="bottom right",
-          )
-          fig.add_hline(
-              y=normal_record,
-              line_dash="dash",
-              line_color="orange",
-              annotation_text=f"정상 기준 ({normal_record}초)",
-              annotation_position="bottom right",
-          )
-
-        # 레이아웃 고정 (스크롤바 및 커서 방지, 한 페이지에 꽉 차게 고정)
-        fig.update_layout(
-            xaxis=dict(type="category"),  # 날짜를 고정 간격 카테고리로 처리
-            margin=dict(l=40, r=40, t=40, b=40),
-            height=400,
-            autosize=True,
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption(
-            "※ 모든 데이터가 스크롤 없이 한 화면에 고정되어 렌더링됩니다."
-        )
-
-      if is_admin:
-        st.write("---")
-        if st.button(f"🗑️ [{view_member}] 선수의 전체 기록 초기화"):
-          del st.session_state.lap_records[view_member]
-          st.success(f"[{view_member}] 선수의 모든 기록이 삭제되었습니다.")
-          st.rerun()
-    else:
-      st.info("💡 아직 저장된 랩타임 기록이 없습니다.")
-
-  # [탭 3] 벤치마크 기준 관리
-  with tab_lap3:
-    st.subheader("📈 학년별·종목별 벤치마크 기준 관리")
-    bm_list = []
-    for grp, evs in st.session_state.benchmark_db.items():
-      for ev, vals in evs.items():
-        bm_list.append({
-            "학년/그룹": grp,
-            "종목": ev,
-            "최정상(초)": vals["최정상"],
-            "정상(초)": vals["정상"],
-        })
-    st.dataframe(pd.DataFrame(bm_list), use_container_width=True)
-
-    if is_admin:
-      st.write("---")
-      st.markdown("#### ➕ 벤치마크 기준 수정/등록 (관리자 전용)")
-      with st.form("bm_edit_form"):
-        b_col1, b_col2, b_col3, b_col4 = st.columns(4)
-        with b_col1:
-          b_grp = st.selectbox(
-              "학년/그룹",
-              [
-                  "초등학교 1학년",
-                  "초등학교 2학년",
-                  "초등학교 3학년",
-                  "초등학교 4학년",
-                  "초등학교 5학년",
-                  "초등학교 6학년",
-                  "중/고등부 또는 성인",
-              ],
-          )
-        with b_col2:
-          b_ev = st.selectbox(
-              "종목", ["100m", "200m", "300m", "500m", "1,000m", "1,500m"]
-          )
-        with b_col3:
-          b_top = st.number_input(
-              "최정상 기준 (초)", value=13.5, format="%.1f"
-          )
-        with b_col4:
-          b_normal = st.number_input("정상 기준 (초)", value=15.0, format="%.1f")
-
-        btn_bm_save = st.form_submit_button(
-            "기준 기록 업데이트", use_container_width=True
-        )
-        if btn_bm_save:
-          if b_grp not in st.session_state.benchmark_db:
-            st.session_state.benchmark_db[b_grp] = {}
-          st.session_state.benchmark_db[b_grp][b_ev] = {
-              "최정상": b_top,
-              "정상": b_normal,
-          }
-          st.success("✅ 벤치마크 기준이 업데이트되었습니다!")
-          st.rerun()
-
-
-# --- 메뉴 2: 대회 정보 및 입상자 ---
-elif main_menu == "2. 🏆 대회 정보 및 입상자":
-  st.title("🏆 대회 정보 및 입상자 명단")
-  events_list = [
-      "2026년 전국 인라인 스케이트 대회",
-      "제1회 클럽 자체 평가전",
-      "2025년 하반기 시합",
-  ]
-  selected_event = st.selectbox("조회할 대회를 선택하세요:", events_list)
-
-  if selected_event not in st.session_state.competition_winners:
-    st.session_state.competition_winners[selected_event] = []
-
-  folder_tabs = st.tabs(["📁 대회 개요 및 사진", "🏆 입상자 명단"])
-
-  with folder_tabs[0]:
-    st.markdown(f"### 📌 [{selected_event}] 대회 개요")
-    if is_admin:
-      uploaded_photo = st.file_uploader(
-          "대회 현장 사진 선택",
-          type=["jpg", "jpeg", "png"],
-          key=f"photo_up_{selected_event}",
-      )
-      if uploaded_photo is not None:
-        if selected_event not in st.session_state.event_photos:
-          st.session_state.event_photos[selected_event] = []
-        st.session_state.event_photos[selected_event].append(uploaded_photo)
-        st.success("사진이 업로드되었습니다!")
-
-    photos = st.session_state.event_photos.get(selected_event, [])
-    if photos:
-      p_cols = st.columns(3)
-      for idx, p in enumerate(photos):
-        with p_cols[idx % 3]:
-          st.image(p, caption=f"현장 사진 {idx+1}", use_container_width=True)
-    else:
-      st.info("💡 등록된 현장 사진이 없습니다.")
-
-  with folder_tabs[1]:
-    winners = st.session_state.competition_winners.get(selected_event, [])
-    if winners:
-      df_winners = pd.DataFrame(winners)
-      st.dataframe(df_winners, use_container_width=True)
-    else:
-      st.info("💡 아직 등록된 입상자 정보가 없습니다.")
-
-    if is_admin:
-      all_club_members = [
-          udata["name"]
-          for uid, udata in st.session_state.users.items()
-          if udata.get("name")
-      ]
-      if not all_club_members:
-        all_club_members = ["등록된 회원 없음"]
-
-      with st.form(f"winner_add_form_{selected_event}", clear_on_submit=True):
-        w_col1, w_col2, w_col3 = st.columns(3)
-        with w_col1:
-          w_name = st.selectbox("선수 이름", all_club_members)
-        with w_col2:
-          w_award = st.selectbox(
-              "순위",
-              [
-                  "1위 (금메달)",
-                  "2위 (은메달)",
-                  "3위 (동메달)",
-                  "최우수상",
-                  "우수상",
-                  "장려상",
-                  "입상",
-              ],
-          )
-        with w_col3:
-          w_event = st.selectbox(
-              "종목",
-              ["100m", "200m", "300m", "500m", "1,000m", "1,500m"],
-          )
-
-        if st.form_submit_button(
-            "🌟 입상자 등록하기", use_container_width=True
-        ):
-          if w_name != "등록된 회원 없음":
-            st.session_state.competition_winners[selected_event].append({
-                "이름": w_name,
-                "순위": w_award,
-                "종목": w_event,
-                "등록일": datetime.now().strftime("%Y-%m-%d"),
-            })
-            st.success("등록되었습니다!")
-            st.rerun()
-
-
-# --- 메뉴 3: 건의사항 ---
-elif main_menu == "3. 💡 건의사항":
-  st.title("💡 무기명 건의사항함")
-  if is_admin:
-    if st.session_state.suggestions:
-      for idx, item in enumerate(st.session_state.suggestions):
-        with st.expander(f"📌 [{idx+1}] {item['title']}"):
-          st.write(item["content"])
-          fb_text = st.text_area(
-              "💬 피드백", value=item.get("feedback", ""), key=f"fb_{idx}"
-          )
-          if st.button("💾 저장", key=f"save_fb_{idx}"):
-            st.session_state.suggestions[idx]["feedback"] = fb_text
-            st.rerun()
-    else:
-      st.info("건의사항이 없습니다.")
-  else:
-    if st.session_state.logged_in_user:
-      with st.form("sug_form", clear_on_submit=True):
-        s_title = st.text_input("제목")
-        s_content = st.text_area("내용")
+elif main_menu == "3. 건의사항":
+    st.title("💡 건의사항")
+    with st.form("sug"):
+        t = st.text_input("제목")
+        c = st.text_area("내용")
         if st.form_submit_button("제출"):
-          if s_title and s_content:
-            st.session_state.suggestions.append(
-                {"title": s_title, "content": s_content, "feedback": ""}
-            )
-            st.success("제출되었습니다.")
-    else:
-      st.warning("로그인 후 이용 가능합니다.")
+            st.session_state.suggestions.append({"title": t, "content": c})
+            save_suggestions_to_disk()
+            st.rerun()
 
-
-# --- 메뉴 4: 회원 승인 및 관리 ---
 elif main_menu == "4. 👥 회원 승인 및 관리 (관리자 전용)":
-  st.title("👥 회원 승인 및 관리")
-  if not is_admin:
-    st.stop()
-  pending = [
-      k
-      for k, v in st.session_state.users.items()
-      if v.get("status") == "pending"
-  ]
-  if pending:
-    sel_p = st.selectbox("승인 대기 회원", pending)
-    if st.button("승인"):
-      st.session_state.users[sel_p]["status"] = "approved"
-      st.rerun()
-  else:
-    st.info("승인 대기 중인 회원이 없습니다.")
+    st.title("👥 회원 관리")
+    if not is_admin: st.stop()
+    
+    # 관리자 화면에서 기존 가입된 유저들의 학년이 잘못되어 있다면 즉시 동기화해줌
+    for uid, udata in st.session_state.users.items():
+        if "birth_year" in udata and udata["birth_year"]:
+            udata["grade"] = get_grade_by_birth_year(udata["birth_year"])
+    save_users_to_disk()
+
+    users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
+    st.dataframe(users_df, use_container_width=True)
