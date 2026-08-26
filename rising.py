@@ -98,9 +98,11 @@ if "suggestions" not in st.session_state:
 if "competitions" not in st.session_state:
     st.session_state.competitions = load_json(COMPETITIONS_FILE, [])
 
-# 샵 선택 상태 저장 변수 초기화
 if "selected_shop" not in st.session_state:
     st.session_state.selected_shop = None
+
+if "menu_selection" not in st.session_state:
+    st.session_state.menu_selection = "홈 (기본 영상)"
 
 default_users = {
     "admin": {
@@ -177,7 +179,12 @@ if is_admin:
 if current_id:
     menu_options.append("🔐 개인정보 변경")
 
-main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options)
+if st.session_state.menu_selection not in menu_options:
+    st.session_state.menu_selection = "홈 (기본 영상)"
+
+current_menu_index = menu_options.index(st.session_state.menu_selection)
+main_menu = st.sidebar.radio("메뉴를 선택하세요", menu_options, index=current_menu_index)
+st.session_state.menu_selection = main_menu
 
 selected_event = None
 if main_menu == "3. 대회 사진첩":
@@ -211,7 +218,7 @@ if main_menu == "3. 대회 사진첩":
                     st.success("폴더가 삭제되었습니다.")
                     st.rerun()
 
-# 6-1. 사이드바 레이싱 전문 샵 및 동영상 링크 섹션
+# 6-1. 사이드바 레이싱 전문 샵 및 동영상 링크 섹션 (클릭 시 자동 메뉴 이동 처리)
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 인라인 레이싱 샵 & 동영상")
 
@@ -221,6 +228,7 @@ with st.sidebar.expander("🏎️ 인라인 레이싱 전문 샵"):
             "name": "스피드인라인 레이싱몰",
             "url": "http://www.speedinline.co.kr/"
         }
+        st.session_state.menu_selection = "5. 🏁 전문 레이싱 샵 (대시보드 보기)"
         st.rerun()
 
 with st.sidebar.expander("🎥 인라인 강습 및 주행 영상"):
@@ -257,7 +265,7 @@ if main_menu == "홈 (기본 영상)":
 
 elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
     st.title("🏁 전문 레이싱(스피드) 샵 대시보드")
-    st.markdown("왼쪽 버튼을 클릭하시면 대시보드 오른쪽 영역에 전문 샵 화면이 바로 표시됩니다.")
+    st.markdown("왼쪽 버튼을 클릭하시거나 사이드바에서 샵을 선택하시면 대시보드 오른쪽 영역에 전문 샵 화면이 바로 표시됩니다.")
     st.markdown("---")
     
     col_left, col_right = st.columns([1, 2])
