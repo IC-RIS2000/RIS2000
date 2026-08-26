@@ -48,18 +48,19 @@ def play_main_video():
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
-        # 바이너리를 base64로 변환하여 HTML에 삽입
         video_base64 = base64.b64encode(video_bytes).decode()
         
-        # 화면을 3등분하여 가운데에 배치하고, HTML로 가로/세로 크기(max-width 등)를 조절
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # 화면 폭에 맞춰 꽉 차게 보이되, 세로가 너무 늘어나지 않도록 조정
+        col1, col2, col3 = st.columns([0.5, 3, 0.5])
         with col2:
             st.markdown(
                 f"""
-                <video width="100%" controls style="max-height: 350px; border-radius: 10px;">
-                    <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
+                <div style="display: flex; justify-content: center; width: 100%;">
+                    <video width="100%" controls style="max-height: 500px; object-fit: contain; border-radius: 10px;">
+                        <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
                 """,
                 unsafe_allow_html=True
             )
