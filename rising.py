@@ -44,13 +44,25 @@ def play_main_video():
     video_path = os.path.join(ASSETS_DIR, "video.mp4")
     
     if os.path.exists(video_path):
+        import base64
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
-        # 화면을 3등분하여 가운데(1열 공간)에만 동영상을 배치하여 크기를 줄입니다.
+        # 바이너리를 base64로 변환하여 HTML에 삽입
+        video_base64 = base64.b64encode(video_bytes).decode()
+        
+        # 화면을 3등분하여 가운데에 배치하고, HTML로 가로/세로 크기(max-width 등)를 조절
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.video(video_bytes)
+            st.markdown(
+                f"""
+                <video width="100%" controls style="max-height: 350px; border-radius: 10px;">
+                    <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                """,
+                unsafe_allow_html=True
+            )
     else:
         st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
