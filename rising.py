@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 from io import BytesIO
+import base64
 
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
@@ -44,7 +45,6 @@ def play_main_video():
     video_path = os.path.join(ASSETS_DIR, "video.mp4")
     
     if os.path.exists(video_path):
-        import base64
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
@@ -823,21 +823,6 @@ elif main_menu == "3. 대회 사진첩":
         st.markdown("---")
         st.markdown("### 🖼️ 사진 갤러리")
         
-        # [수정된 CSS] 모든 사진 크기를 완전히 고정(정사각형 형태, 꽉 채우기)
-        st.markdown(
-            """
-            <style>
-            div.stImage > img {
-                width: 100% !important;
-                height: 250px !important;
-                object-fit: cover !important;
-                border-radius: 8px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        
         if os.path.exists(folder_path):
             photo_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
             
@@ -845,10 +830,23 @@ elif main_menu == "3. 대회 사진첩":
                 cols = st.columns(3)
                 for idx, photo_file in enumerate(photo_files):
                     p_path = os.path.join(folder_path, photo_file)
+                    
+                    # 이미지를 완벽하게 고정된 크기(너비 100%, 높이 240px)로 렌더링하기 위해 Base64 HTML 직접 활용
+                    with open(p_path, "rb") as img_f:
+                        encoded_img = base64.b64encode(img_f.read()).decode()
+                    
                     with cols[idx % 3]:
-                        st.image(p_path, caption=photo_file, use_container_width=True)
+                        st.markdown(
+                            f"""
+                            <div style="margin-bottom: 10px;">
+                                <img src="data:image/jpeg;base64,{encoded_img}" style="width: 100%; height: 240px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                                <p style="font-size: 0.85rem; color: #b0b0b0; text-align: center; margin-top: 5px; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{photo_file}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
                         if is_admin:
-                            if st.button("삭제", key=f"del_photo_{selected_event}_{photo_file}"):
+                            if st.button("삭제", key=f"del_photo_{selected_event}_{photo_file}", use_container_width=True):
                                 os.remove(p_path)
                                 st.success(f"'{photo_file}' 사진이 삭제되었습니다.")
                                 st.rerun()
