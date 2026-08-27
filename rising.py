@@ -220,32 +220,110 @@ with st.sidebar.expander("🎥 인라인 강습 및 주행 영상"):
     st.markdown("- [인라인 초급 과정 강좌보기](https://www.youtube.com/watch?v=l7cuAsNMtTE)", unsafe_allow_html=True)
     st.markdown("- [기초 턴 및 기술 연습보기](https://www.youtube.com/watch?v=nzpLqBZ-1lQ)", unsafe_allow_html=True)
 
+# 7. 사이드바 사용자 인증 및 로그인 / 회원가입 섹션
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔑 계정 관리")
+st.sidebar.header("🔐 로그인 / 회원가입")
 
-if st.session_state.logged_in_user:
-    u_info = st.session_state.users[st.session_state.logged_in_user]
+if current_id is None:
+    auth_mode = st.sidebar.radio("모드 선택", ["로그인", "회원가입"], key="auth_mode_radio")
+    
+    if auth_mode == "로그인":
+        with st.sidebar.form("login_form"):
+            login_id = st.text_input("아이디 (ID)")
+            login_pw = st.text_input("비밀번호 (PW)", type="password")
+            submit_login = st.form_submit_button("로그인")
+            
+            if submit_login:
+                if login_id in st.session_state.users:
+                    user_info = st.session_state.users[login_id]
+                    if user_info["pw"] == login_pw:
+                        if user_info.get("status") == "approved" or login_id == "admin":
+                            st.session_state.logged_in_user = login_id
+                            st.success(f"환영합니다, {user_info['name']}님!")
+                            st.rerun()
+                        else:
+                            st.warning("관리자 승인 대기 중인 계정입니다. 승인 후 이용 가능합니다.")
+                    else:
+                        st.error("비밀번호가 일치하지 않습니다.")
+                else:
+                    st.error("존재하지 않는 아이디입니다.")
+                    
+    elif auth_mode == "회원가입":
+        with st.sidebar.form("signup_form"):
+            new_id = st.text_input("사용할 아이디 (ID)")
+            new_pw = st.text_input("비밀번호 (PW)", type="password")
+            new_name = st.text_input("이름")
+            new_phone = st.text_input("전화번호 (예: 010-1234-5678)")
+            new_gender = st.selectbox("성별", ["남자", "여자"])
+            new_birth_year = st.number_input("출생년도 (4자리)", min_value=1940, max_value=datetime.now().year, value=2015, step=1)
+            
+            submit_signup = st.form_submit_button("가입 신청")
+            
+            if submit_signup:
+                if not new_id or not new_pw or not new_name or not new_phone:
+                    st.error("모든 항목을 입력해주세요.")
+                elif new_id in st.session_state.users:
+                    st.error("이미 존재하는 아이디입니다.")
+                else:
+                    calc_grade = get_grade_by_birth_year(new_birth_year)
+                    st.session_state.users[new_id] = {
+                        "pw": new_pw,
+                        "name": new_name,
+                        "phone": new_phone,
+                        "gender": new_gender,
+                        "birth_year": int(new_birth_year),
+                        "grade": calc_grade,
+                        "role": "member",
+                        "status": "pending",
+                        "join_date": datetime.now().strftime("%Y-%m-%d"),
+                        "pay_status": "미납"
+                    }
+                    save_users_to_disk()
+                    st.success("가입 신청이 완료되었습니다! 관리자 승인 후 로그인할 수 있습니다.")
+else:
+    u_info = st.session_state.users[current_id]
     st.sidebar.success(f"👤 **{u_info['name']}**님 ({u_info.get('gender', '-')}/{u_info.get('grade', '회원')})")
     if st.sidebar.button("🚪 로그아웃", use_container_width=True):
         st.session_state.logged_in_user = None
+        st.success("로그아웃 되었습니다.")
         st.rerun()
-else:
-    with st.sidebar.form("login_form"):
-        uid_input = st.text_input("아이디")
-        pw_input = st.text_input("비밀번호", type="password")
-        if st.form_submit_button("로그인"):
-            if uid_input in st.session_state.users and st.session_state.users[uid_input]["pw"] == pw_input:
-                st.session_state.logged_in_user = uid_input
-                st.success("로그인 성공!")
-                st.rerun()
-            else:
-                st.error("아이디 또는 비밀번호가 잘못되었습니다.")
 
-# 7. 메인 화면 분기 처리
+# 8. 메인 화면 분기 처리
 if main_menu == "홈 (기본 영상)":
-    st.title("🏆 Rising Inline Club 대시보드")
-    st.markdown(st.session_state.club_notice)
+    st.title("🔥 Rising Inline Club 대시보드")
+    st.markdown("라이징 인라인 클럽 공식 플랫폼에 오신 것을 환영합니다! 아래의 공지사항과 영상을 확인해 주세요.")
+    
     st.markdown("---")
+    
+    col_n1, col_n2 = st.columns([2, 1])
+    with col_n1:
+        st.subheader("📢 클럽 공지사항")
+        if is_admin:
+            edited_notice = st.text_area("공지사항 편집 (관리자 전용)", value=st.session_state.club_notice, height=150)
+            if st.button("공지사항 저장"):
+                st.session_state.club_notice = edited_notice
+                save_notice_to_disk()
+                st.success("공지사항이 업데이트되었습니다!")
+                st.rerun()
+        else:
+            st.markdown(
+                f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; border-left: 5px solid #ff4b4b;">
+                    {st.session_state.club_notice.replace('\n', '<br>')}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+    with col_n2:
+        st.subheader("⚡ Quick Links")
+        st.markdown("- **LAB Time Recorder**: 개인별 랩타임 측정 및 시각화")
+        st.markdown("- **대회 참가 신청**: 다가오는 대회 명단 등록")
+        st.markdown("- **대회 사진첩**: 대회 현장 사진 및 입상자 확인")
+        st.markdown("- **건의사항**: 클럽 운영 관련 건의 및 소통")
+
+    st.markdown("---")
+    st.subheader("🎬 클럽 하이라이트 영상")
     play_main_video()
 
 elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
@@ -275,7 +353,112 @@ elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
 
 elif main_menu == "1. 개인별 LAB Time Recorder":
     st.title("⏱️ 개인별 LAB Time Recorder")
-    st.write("기록 측정 및 분석 기능 영역입니다.")
+    st.markdown("인라인 스케이팅 기록을 측정하고 회차별 성장 추이를 확인하세요.")
+    
+    tab_rec1, tab_rec2, tab_rec3 = st.tabs(["📊 기록 조회 및 그래프", "📝 기록 입력 및 수정", "🏆 기록 순위표"])
+    
+    df_records = st.session_state.lab_records
+    
+    with tab_rec1:
+        st.subheader("📈 개인별 성장 추이 그래프")
+        if df_records.empty:
+            st.info("등록된 기록 데이터가 없습니다. '기록 입력 및 수정' 탭에서 데이터를 추가해주세요.")
+        else:
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                sel_name = st.selectbox("이름 선택", options=df_records["이름"].unique())
+            with col_f2:
+                user_events = df_records[df_records["이름"] == sel_name]["종목"].unique()
+                sel_event = st.selectbox("종목 선택", options=user_events)
+            with col_f3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+            filtered_df = df_records[(df_records["이름"] == sel_name) & (df_records["종목"] == sel_event)]
+            
+            if not filtered_df.empty:
+                filtered_df = filtered_df.sort_values(by=["입력 날짜", "측정 회차"])
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=filtered_df["측정 회차"] + " (" + filtered_df["입력 날짜"] + ")",
+                    y=filtered_df["기록"],
+                    mode='lines+markers',
+                    name=f"{sel_name} - {sel_event}",
+                    line=dict(width=3, color='#1f77b4'),
+                    marker=dict(size=8)
+                ))
+                fig.update_layout(
+                    title=f"<b>{sel_name}</b>님의 <b>{sel_event}</b> 기록 변화 추이",
+                    xaxis_title="측정 시점 (회차 및 날짜)",
+                    yaxis_title="기록 (초 / 점수)",
+                    template="plotly_white",
+                    hovermode="x unified"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("#### 📋 상세 기록 데이터")
+                st.dataframe(filtered_df, use_container_width=True)
+            else:
+                st.warning("선택한 조건에 맞는 데이터가 없습니다.")
+
+    with tab_rec2:
+        st.subheader("📝 LAB 기록 입력")
+        if not current_id:
+            st.warning("기록을 입력하려면 로그인이 필요합니다.")
+        else:
+            cur_user_info = st.session_state.users[current_id]
+            with st.form("record_input_form"):
+                col_i1, col_i2 = st.columns(2)
+                with col_i1:
+                    input_date = st.date_input("측정 날짜", value=datetime.now())
+                    input_round = st.selectbox("측정 회차", ["1회차", "2회차", "3회차", "4회차", "5회차", "6회차", "7회차", "8회차", "9회차", "10회차"])
+                    input_name = st.text_input("이름", value=cur_user_info["name"])
+                with col_i2:
+                    input_grade = st.text_input("학년/부서", value=cur_user_info.get("grade", "성인부"))
+                    input_gender = st.selectbox("성별", ["남자", "여자"], index=0 if cur_user_info["gender"]=="남자" else 1)
+                    input_event = st.selectbox("종목", ["200m 타임트라이얼", "500m 스프린트", "1000m", "3000m 포인트", "마라톤"])
+                    input_record = st.number_input("기록 (초 단위 또는 점수)", min_value=0.0, value=30.0, step=0.01)
+                
+                submit_record = st.form_submit_button("기록 저장하기")
+                
+                if submit_record:
+                    new_row = {
+                        "ID": current_id,
+                        "입력 날짜": input_date.strftime("%Y-%m-%d"),
+                        "측정 회차": input_round,
+                        "이름": input_name,
+                        "학년": input_grade,
+                        "성별": input_gender,
+                        "종목": input_event,
+                        "기록": float(input_record)
+                    }
+                    st.session_state.lab_records = pd.concat([st.session_state.lab_records, pd.DataFrame([new_row])], ignore_index=True)
+                    save_records_to_disk()
+                    st.success("기록이 성공적으로 저장되었습니다!")
+                    st.rerun()
+            
+            if is_admin and not df_records.empty:
+                st.markdown("---")
+                st.markdown("#### 🛠️ 관리자용 기록 삭제 기능")
+                del_idx = st.number_input("삭제할 행 번호 (Index)", min_value=0, max_value=max(0, len(df_records)-1), step=1)
+                if st.button("선택한 행 기록 삭제"):
+                    st.session_state.lab_records = df_records.drop(index=del_idx).reset_index(drop=True)
+                    save_records_to_disk()
+                    st.success(f"{del_idx}번 행 기록이 삭제되었습니다.")
+                    st.rerun()
+
+    with tab_rec3:
+        st.subheader("🏆 종목별 명예의 전당 (최고 기록 순위)")
+        if df_records.empty:
+            st.info("데이터가 없습니다.")
+        else:
+            rank_event = st.selectbox("순위를 확인할 종목 선택", options=df_records["종목"].unique())
+            event_df = df_records[df_records["종목"] == rank_event].copy()
+            if not event_df.empty:
+                event_df = event_df.sort_values(by="기록", ascending=True).reset_index(drop=True)
+                st.dataframe(event_df[["측정 회차", "입력 날짜", "이름", "학년", "성별", "기록"]], use_container_width=True)
+            else:
+                st.warning("해당 종목에 기록이 없습니다.")
 
 elif main_menu == "2. 대회 참가 신청 및 명단":
     st.title("📝 대회 참가 신청 및 명단")
