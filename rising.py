@@ -291,7 +291,7 @@ else:
 # 8. 메인 화면 분기 처리
 if main_menu == "홈 (기본 영상)":
     st.title("Rising Inline Club")
-    st.markdown("문의 (H.P 010.6677.0633)")
+    st.markdown("문의 : 박희영 감독(H.P 010.6677.0633)")
     
     st.markdown("---")
     
