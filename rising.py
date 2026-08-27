@@ -290,13 +290,17 @@ else:
 
 # 8. 메인 화면 분기 처리
 if main_menu == "홈 (기본 영상)":
-    st.title("🔥 Rising Inline Club 대시보드")
-    st.markdown("라이징 인라인 클럽 공식 플랫폼에 오신 것을 환영합니다! 아래의 공지사항과 영상을 확인해 주세요.")
+    st.title("Rising Inline Club")
+    st.markdown("문의 (H.P 010.6677.0633)")
     
     st.markdown("---")
     
     col_n1, col_n2 = st.columns([2, 1])
     with col_n1:
+        st.subheader("🎬 클럽 하이라이트 영상")
+        play_main_video()
+            
+    with col_n2:
         st.subheader("📢 클럽 공지사항")
         if is_admin:
             edited_notice = st.text_area("공지사항 편집 (관리자 전용)", value=st.session_state.club_notice, height=150)
@@ -314,17 +318,6 @@ if main_menu == "홈 (기본 영상)":
                 """,
                 unsafe_allow_html=True
             )
-            
-    with col_n2:
-        st.subheader("⚡ Quick Links")
-        st.markdown("- **LAB Time Recorder**: 개인별 랩타임 측정 및 시각화")
-        st.markdown("- **대회 참가 신청**: 다가오는 대회 명단 등록")
-        st.markdown("- **대회 사진첩**: 대회 현장 사진 및 입상자 확인")
-        st.markdown("- **건의사항**: 클럽 운영 관련 건의 및 소통")
-
-    st.markdown("---")
-    st.subheader("🎬 클럽 하이라이트 영상")
-    play_main_video()
 
 elif main_menu == "5. 🏁 전문 레이싱 샵 (대시보드 보기)":
     st.title("🏁 국내 주요 인라인 전문 쇼핑몰 안내")
