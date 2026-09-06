@@ -87,10 +87,11 @@ def get_grade_by_birth_year(birth_year):
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
 
-# 4-1. Gemini AI 사진 OCR 분석 함수
-def extract_lab_records_from_image(image_bytes, api_key):
+# 4-1. Gemini AI 사진 OCR 분석 함수 (st.secrets 사용)
+def extract_lab_records_from_image(image_bytes):
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
     if not api_key:
-        return None, "API Key가 입력되지 않았습니다."
+        return None, "서버에 Gemini API Key가 설정되지 않았습니다. 관리자에게 문의하세요."
     try:
         client = genai.Client(api_key=api_key)
         prompt = """
@@ -498,39 +499,35 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         st.subheader("📸 사진으로 기록 자동 입력 (Gemini OCR)")
         st.markdown("기록지 사진을 업로드하면 Gemini AI가 자동으로 글자를 인식하여 기록으로 추가해 줍니다.")
         
-        api_key_input = st.text_input("Gemini API Key 입력", type="password", help="Google GenAI API 키를 입력해주세요.")
         uploaded_record_image = st.file_uploader("기록지 사진 업로드", type=["jpg", "jpeg", "png"])
         
         if uploaded_record_image and st.button("🤖 AI로 기록지 분석 및 추가하기"):
-            if not api_key_input:
-                st.error("Gemini API Key를 먼저 입력해주세요.")
-            else:
-                with st.spinner("AI가 기록지 사진을 분석하고 있습니다..."):
-                    image_bytes = uploaded_record_image.getvalue()
-                    extracted_data, err = extract_lab_records_from_image(image_bytes, api_key_input)
-                    if err:
-                        st.error(f"분석 중 오류가 발생했습니다: {err}")
-                    elif extracted_data:
-                        st.success("사진 분석이 완료되었습니다! 아래 데이터를 확인하세요.")
-                        extracted_df = pd.DataFrame(extracted_data)
-                        st.dataframe(extracted_df, use_container_width=True)
-                        
-                        if st.button("💾 위 분석된 데이터를 기록장에 최종 반영하기"):
-                            for _, row in extracted_df.iterrows():
-                                new_row = {
-                                    "ID": current_id if current_id else "unknown",
-                                    "입력 날짜": datetime.now().strftime("%Y-%m-%d"),
-                                    "측정 회차": str(row.get("측정 회차", "1회차")),
-                                    "이름": str(row.get("이름", "무명")),
-                                    "학년": str(row.get("학년", "성인부")),
-                                    "성별": str(row.get("성별", "남자")),
-                                    "종목": str(row.get("종목", "200m 타임트라이얼")),
-                                    "기록": float(row.get("기록", 0.0))
-                                }
-                                st.session_state.lab_records = pd.concat([st.session_state.lab_records, pd.DataFrame([new_row])], ignore_index=True)
-                            save_records_to_disk()
-                            st.success("모든 기록이 성공적으로 추가되었습니다!")
-                            st.rerun()
+            with st.spinner("AI가 기록지 사진을 분석하고 있습니다..."):
+                image_bytes = uploaded_record_image.getvalue()
+                extracted_data, err = extract_lab_records_from_image(image_bytes)
+                if err:
+                    st.error(f"분석 중 오류가 발생했습니다: {err}")
+                elif extracted_data:
+                    st.success("사진 분석이 완료되었습니다! 아래 데이터를 확인하세요.")
+                    extracted_df = pd.DataFrame(extracted_data)
+                    st.dataframe(extracted_df, use_container_width=True)
+                    
+                    if st.button("💾 위 분석된 데이터를 기록장에 최종 반영하기"):
+                        for _, row in extracted_df.iterrows():
+                            new_row = {
+                                "ID": current_id if current_id else "unknown",
+                                "입력 날짜": datetime.now().strftime("%Y-%m-%d"),
+                                "측정 회차": str(row.get("측정 회차", "1회차")),
+                                "이름": str(row.get("이름", "무명")),
+                                "학년": str(row.get("학년", "성인부")),
+                                "성별": str(row.get("성별", "남자")),
+                                "종목": str(row.get("종목", "200m 타임트라이얼")),
+                                "기록": float(row.get("기록", 0.0))
+                            }
+                            st.session_state.lab_records = pd.concat([st.session_state.lab_records, pd.DataFrame([new_row])], ignore_index=True)
+                        save_records_to_disk()
+                        st.success("모든 기록이 성공적으로 추가되었습니다!")
+                        st.rerun()
 
 elif main_menu == "2. 대회 참가 신청 및 명단":
     st.title("📝 대회 참가 신청 및 명단")
