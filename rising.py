@@ -87,11 +87,9 @@ def get_grade_by_birth_year(birth_year):
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
 
-# 4-1. Gemini AI 사진 OCR 분석 함수 (st.secrets 사용)
+# 4-1. Gemini AI 사진 OCR 분석 함수 (제공된 API Key 직접 적용)
 def extract_lab_records_from_image(image_bytes):
-    api_key = st.secrets.get("GEMINI_API_KEY", "")
-    if not api_key:
-        return None, "서버에 Gemini API Key가 설정되지 않았습니다. 관리자에게 문의하세요."
+    api_key = "AQ.Ab8RN6IOZwJSyzVUc78D2ov1KqV5wIRnV5x7_H8pYAOejbacgQ"
     try:
         client = genai.Client(api_key=api_key)
         prompt = """
