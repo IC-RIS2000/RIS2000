@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from io import BytesIO
 import base64
+import time
 from google import genai
 from google.genai import types
 
@@ -87,43 +88,58 @@ def get_grade_by_birth_year(birth_year):
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
 
-# 4-1. Gemini AI 사진 OCR 분석 함수 (모델 이름 gemini-3.6-flash 적용)
+# 4-1. Gemini AI 사진 OCR 분석 함수 (자동 재시도 및 예외 처리 적용)
 def extract_lab_records_from_image(image_bytes):
     api_key = "AQ.Ab8RN6IOZwJSyzVUc78D2ov1KqV5wIRnV5x7_H8pYAOejbacgQ"
-    try:
-        client = genai.Client(api_key=api_key)
-        prompt = """
-        이 사진은 인라인 스케이팅 훈련 수기 랩타임 기록지입니다. 
-        사진에 적힌 데이터(이름, 종목, 기록, 측정 회차, 학년, 성별 등)를 읽어서 정확히 추출해주세요.
-        반드시 아래의 JSON 배열 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
-        [
-          {
-            "이름": "홍길동",
-            "종목": "200m 타임트라이얼",
-            "기록": 28.52,
-            "측정 회차": "1회차",
-            "학년": "4학년",
-            "성별": "남자"
-          }
-        ]
-        * 종목은 다음 중 하나로 매칭해주세요: ['200m 타임트라이얼', '500m 스프린트', '1000m', '3000m 포인트', '마라톤']
-        * 기록은 숫자(초 단위, 예: 28.52)로 변환해주세요.
-        """
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
-                prompt
-            ]
-        )
-        text_response = response.text.strip()
-        if text_response.startswith("```json"):
-            text_response = text_response[7:-3].strip()
-        elif text_response.startswith("```"):
-            text_response = text_response[3:-3].strip()
-        return json.loads(text_response), None
-    except Exception as e:
-        return None, str(e)
+    client = genai.Client(api_key=api_key)
+    prompt = """
+    이 사진은 인라인 스케이팅 훈련 수기 랩타임 기록지입니다. 
+    사진에 적힌 데이터(이름, 종목, 기록, 측정 회차, 학년, 성별 등)를 읽어서 정확히 추출해주세요.
+    반드시 아래의 JSON 배열 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
+    [
+      {
+        "이름": "홍길동",
+        "종목": "200m 타임트라이얼",
+        "기록": 28.52,
+        "측정 회차": "1회차",
+        "학년": "4학년",
+        "성별": "남자"
+      }
+    ]
+    * 종목은 다음 중 하나로 매칭해주세요: ['200m 타임트라이얼', '500m 스프린트', '1000m', '3000m 포인트', '마라톤']
+    * 기록은 숫자(초 단위, 예: 28.52)로 변환해주세요.
+    """
+    
+    max_retries = 3
+    delay = 2  # 초기 대기 시간 (초)
+
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model='gemini-3.6-flash',
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                    prompt
+                ]
+            )
+            text_response = response.text.strip()
+            if text_response.startswith("```json"):
+                text_response = text_response[7:-3].strip()
+            elif text_response.startswith("```"):
+                text_response = text_response[3:-3].strip()
+            return json.loads(text_response), None
+        
+        except Exception as e:
+            err_str = str(e)
+            # 503(UNAVAILABLE) 또는 429(RATE_LIMIT) 등의 서버 과부하 관련 오류인 경우 재시도
+            if ("503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str) and attempt < max_retries - 1:
+                time.sleep(delay)
+                delay *= 2  # 지수 백오프: 대기 시간을 2배로 증가 (2초 -> 4초 -> 8초)
+                continue
+            else:
+                if attempt == max_retries - 1:
+                    return None, f"서버 과부하로 인해 {max_retries회 시도가 모두 실패했습니다. 상세 오류: {err_str}"
+                return None, err_str
 
 # 5. Session State 초기화
 today_str = datetime.now().strftime("%Y-%m-%d")
@@ -500,7 +516,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         uploaded_record_image = st.file_uploader("기록지 사진 업로드", type=["jpg", "jpeg", "png"])
         
         if uploaded_record_image and st.button("🤖 AI로 기록지 분석 및 추가하기"):
-            with st.spinner("AI가 기록지 사진을 분석하고 있습니다..."):
+            with st.spinner("AI가 기록지 사진을 분석하고 있습니다 (서버 상태에 따라 재시도할 수 있습니다)..."):
                 image_bytes = uploaded_record_image.getvalue()
                 extracted_data, err = extract_lab_records_from_image(image_bytes)
                 if err:
