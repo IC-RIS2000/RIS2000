@@ -126,7 +126,7 @@ def extract_lab_records_from_image(image_bytes):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model='gemini-3.6-flash',
+                model='gemini-2.5-flash',
                 contents=[
                     types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
                     prompt
@@ -528,6 +528,10 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         
         uploaded_record_image = st.file_uploader("기록지 사진 업로드", type=["jpg", "jpeg", "png"])
         
+        # 업로드한 사진 미리보기 추가 (확인 불가 문제 해결)
+        if uploaded_record_image is not None:
+            st.image(uploaded_record_image, caption="업로드한 기록지 사진 미리보기", use_container_width=True)
+        
         if uploaded_record_image and st.button("🤖 AI로 기록지 분석 및 추가하기"):
             with st.spinner("AI가 기록지 사진을 분석하고 있습니다 (서버 상태에 따라 재시도할 수 있습니다)..."):
                 image_bytes = uploaded_record_image.getvalue()
@@ -661,9 +665,21 @@ elif is_admin and main_menu == "6. 👥 회원 승인 및 관리 (관리자 전�
         st.info("현재 승인 대기 중인 회원이 없습니다.")
 
     st.markdown("---")
-    st.subheader("📋 전체 회원 목록")
+    st.subheader("📋 전체 회원 목록 및 삭제 관리")
     users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
     st.dataframe(users_df, use_container_width=True)
+
+    # 회원 삭제 기능 추가
+    st.markdown("#### 🗑️ 회원 삭제")
+    target_delete_id = st.selectbox("삭제할 회원 아이디 선택", options=list(st.session_state.users.keys()))
+    if target_delete_id == "admin":
+        st.warning("최고관리자(admin) 계정은 삭제할 수 없습니다.")
+    else:
+        if st.button("🚨 선택한 회원 계정 영구 삭제"):
+            del st.session_state.users[target_delete_id]
+            save_users_to_disk()
+            st.success(f"아이디 '{target_delete_id}' 회원이 삭제되었습니다.")
+            st.rerun()
 
 elif current_id and main_menu == "🔐 개인정보 변경":
     st.title("🔐 개인정보 변경 (비밀번호 / 학년 / 성별)")
