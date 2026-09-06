@@ -87,7 +87,7 @@ def get_grade_by_birth_year(birth_year):
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
 
-# 4-1. Gemini AI 사진 OCR 분석 함수 (제공된 API Key 직접 적용)
+# 4-1. Gemini AI 사진 OCR 분석 함수 (모델 이름 gemini-3.6-flash 적용)
 def extract_lab_records_from_image(image_bytes):
     api_key = "AQ.Ab8RN6IOZwJSyzVUc78D2ov1KqV5wIRnV5x7_H8pYAOejbacgQ"
     try:
@@ -110,7 +110,7 @@ def extract_lab_records_from_image(image_bytes):
         * 기록은 숫자(초 단위, 예: 28.52)로 변환해주세요.
         """
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
                 prompt
