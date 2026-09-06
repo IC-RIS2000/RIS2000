@@ -6,6 +6,8 @@ import plotly.graph_objects as go
 from datetime import datetime
 from io import BytesIO
 import base64
+from google import genai
+from google.genai import types
 
 # 1. 페이지 레이아웃 설정
 st.set_page_config(layout="wide", page_title="Rising Inline Club")
@@ -84,6 +86,45 @@ def get_grade_by_birth_year(birth_year):
     elif 14 <= age <= 16: return "중등부"
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
+
+# 4-1. Gemini AI 사진 OCR 분석 함수
+def extract_lab_records_from_image(image_bytes, api_key):
+    if not api_key:
+        return None, "API Key가 입력되지 않았습니다."
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = """
+        이 사진은 인라인 스케이팅 훈련 수기 랩타임 기록지입니다. 
+        사진에 적힌 데이터(이름, 종목, 기록, 측정 회차, 학년, 성별 등)를 읽어서 정확히 추출해주세요.
+        반드시 아래의 JSON 배열 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
+        [
+          {
+            "이름": "홍길동",
+            "종목": "200m 타임트라이얼",
+            "기록": 28.52,
+            "측정 회차": "1회차",
+            "학년": "4학년",
+            "성별": "남자"
+          }
+        ]
+        * 종목은 다음 중 하나로 매칭해주세요: ['200m 타임트라이얼', '500m 스프린트', '1000m', '3000m 포인트', '마라톤']
+        * 기록은 숫자(초 단위, 예: 28.52)로 변환해주세요.
+        """
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                prompt
+            ]
+        )
+        text_response = response.text.strip()
+        if text_response.startswith("```json"):
+            text_response = text_response[7:-3].strip()
+        elif text_response.startswith("```"):
+            text_response = text_response[3:-3].strip()
+        return json.loads(text_response), None
+    except Exception as e:
+        return None, str(e)
 
 # 5. Session State 초기화
 today_str = datetime.now().strftime("%Y-%m-%d")
@@ -348,14 +389,14 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
     st.title("⏱️ 개인별 LAB Time Recorder")
     st.markdown("인라인 스케이팅 기록을 측정하고 회차별 성장 추이를 확인하세요.")
     
-    tab_rec1, tab_rec2, tab_rec3 = st.tabs(["📊 기록 조회 및 그래프", "📝 기록 입력 및 수정", "🏆 기록 순위표"])
+    tab_rec1, tab_rec2, tab_rec3, tab_rec4 = st.tabs(["📊 기록 조회 및 그래프", "📝 기록 입력 및 수정", "🏆 기록 순위표", "📸 사진으로 기록 추가 (Gemini OCR)"])
     
     df_records = st.session_state.lab_records
     
     with tab_rec1:
         st.subheader("📈 개인별 성장 추이 그래프")
         if df_records.empty:
-            st.info("등록된 기록 데이터가 없습니다. '기록 입력 및 수정' 탭에서 데이터를 추가해주세요.")
+            st.info("등록된 기록 데이터가 없습니다. '기록 입력 및 수정' 또는 '사진으로 기록 추가' 탭에서 데이터를 추가해주세요.")
         else:
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
@@ -452,6 +493,44 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 st.dataframe(event_df[["측정 회차", "입력 날짜", "이름", "학년", "성별", "기록"]], use_container_width=True)
             else:
                 st.warning("해당 종목에 기록이 없습니다.")
+
+    with tab_rec4:
+        st.subheader("📸 사진으로 기록 자동 입력 (Gemini OCR)")
+        st.markdown("기록지 사진을 업로드하면 Gemini AI가 자동으로 글자를 인식하여 기록으로 추가해 줍니다.")
+        
+        api_key_input = st.text_input("Gemini API Key 입력", type="password", help="Google GenAI API 키를 입력해주세요.")
+        uploaded_record_image = st.file_uploader("기록지 사진 업로드", type=["jpg", "jpeg", "png"])
+        
+        if uploaded_record_image and st.button("🤖 AI로 기록지 분석 및 추가하기"):
+            if not api_key_input:
+                st.error("Gemini API Key를 먼저 입력해주세요.")
+            else:
+                with st.spinner("AI가 기록지 사진을 분석하고 있습니다..."):
+                    image_bytes = uploaded_record_image.getvalue()
+                    extracted_data, err = extract_lab_records_from_image(image_bytes, api_key_input)
+                    if err:
+                        st.error(f"분석 중 오류가 발생했습니다: {err}")
+                    elif extracted_data:
+                        st.success("사진 분석이 완료되었습니다! 아래 데이터를 확인하세요.")
+                        extracted_df = pd.DataFrame(extracted_data)
+                        st.dataframe(extracted_df, use_container_width=True)
+                        
+                        if st.button("💾 위 분석된 데이터를 기록장에 최종 반영하기"):
+                            for _, row in extracted_df.iterrows():
+                                new_row = {
+                                    "ID": current_id if current_id else "unknown",
+                                    "입력 날짜": datetime.now().strftime("%Y-%m-%d"),
+                                    "측정 회차": str(row.get("측정 회차", "1회차")),
+                                    "이름": str(row.get("이름", "무명")),
+                                    "학년": str(row.get("학년", "성인부")),
+                                    "성별": str(row.get("성별", "남자")),
+                                    "종목": str(row.get("종목", "200m 타임트라이얼")),
+                                    "기록": float(row.get("기록", 0.0))
+                                }
+                                st.session_state.lab_records = pd.concat([st.session_state.lab_records, pd.DataFrame([new_row])], ignore_index=True)
+                            save_records_to_disk()
+                            st.success("모든 기록이 성공적으로 추가되었습니다!")
+                            st.rerun()
 
 elif main_menu == "2. 대회 참가 신청 및 명단":
     st.title("📝 대회 참가 신청 및 명단")
