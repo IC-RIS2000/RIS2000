@@ -67,7 +67,7 @@ def play_main_video():
     else:
         st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
-# 4. 나이 및 정확한 학년 계산 함수
+# 4. 나이, 학년 계산 및 시간 포맷팅 함수
 def get_age_by_birth_year(birth_year):
     current_year = datetime.now().year
     try:
@@ -87,6 +87,16 @@ def get_grade_by_birth_year(birth_year):
     elif 14 <= age <= 16: return "중등부"
     elif 17 <= age <= 19: return "고등부"
     else: return "성인부"
+
+def format_time(seconds):
+    try:
+        total_ms = int(round(float(seconds) * 1000))
+        m = total_ms // 60000
+        s = (total_ms % 60000) // 1000
+        ms = total_ms % 1000
+        return f"{m:02d}:{s:02d}:{ms:03d}"
+    except:
+        return str(seconds)
 
 # 4-1. Gemini AI 사진 OCR 분석 함수 (자동 재시도 및 예외 처리 적용)
 def extract_lab_records_from_image(image_bytes):
@@ -445,7 +455,9 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 st.plotly_chart(fig, use_container_width=True)
                 
                 st.markdown("#### 📋 상세 기록 데이터")
-                st.dataframe(filtered_df, use_container_width=True)
+                display_filtered_df = filtered_df.copy()
+                display_filtered_df["기록"] = display_filtered_df["기록"].apply(format_time)
+                st.dataframe(display_filtered_df, use_container_width=True)
             else:
                 st.warning("선택한 조건에 맞는 데이터가 없습니다.")
 
@@ -465,7 +477,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                     input_grade = st.text_input("학년/부서", value=cur_user_info.get("grade", "성인부"))
                     input_gender = st.selectbox("성별", ["남자", "여자"], index=0 if cur_user_info["gender"]=="남자" else 1)
                     input_event = st.selectbox("종목", ["200m 타임트라이얼", "500m 스프린트", "1000m", "3000m 포인트", "마라톤"])
-                    input_record = st.number_input("기록 (초 단위 또는 점수)", min_value=0.0, value=30.0, step=0.01)
+                    input_record = st.number_input("기록 (초 단위 또는 점수, 예: 28.52)", min_value=0.0, value=30.0, step=0.01, format="%.3f")
                 
                 submit_record = st.form_submit_button("기록 저장하기")
                 
@@ -504,7 +516,9 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
             event_df = df_records[df_records["종목"] == rank_event].copy()
             if not event_df.empty:
                 event_df = event_df.sort_values(by="기록", ascending=True).reset_index(drop=True)
-                st.dataframe(event_df[["측정 회차", "입력 날짜", "이름", "학년", "성별", "기록"]], use_container_width=True)
+                display_event_df = event_df[["측정 회차", "입력 날짜", "이름", "학년", "성별", "기록"]].copy()
+                display_event_df["기록"] = display_event_df["기록"].apply(format_time)
+                st.dataframe(display_event_df, use_container_width=True)
             else:
                 st.warning("해당 종목에 기록이 없습니다.")
 
@@ -523,7 +537,10 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
                 elif extracted_data:
                     st.success("사진 분석이 완료되었습니다! 아래 데이터를 확인하세요.")
                     extracted_df = pd.DataFrame(extracted_data)
-                    st.dataframe(extracted_df, use_container_width=True)
+                    display_extracted_df = extracted_df.copy()
+                    if "기록" in display_extracted_df.columns:
+                        display_extracted_df["기록"] = display_extracted_df["기록"].apply(format_time)
+                    st.dataframe(display_extracted_df, use_container_width=True)
                     
                     if st.button("💾 위 분석된 데이터를 기록장에 최종 반영하기"):
                         for _, row in extracted_df.iterrows():
