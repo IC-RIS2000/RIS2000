@@ -67,7 +67,7 @@ def play_main_video():
     else:
         st.warning(f"동영상 파일을 찾을 수 없습니다. 경로를 확인해주세요: {video_path}")
 
-# 4. 나이, 학년 계산 및 시간 포맷팅 함수
+# 4. 나이, 학년 계산 및 시간 포맷팅 함수 (분:초:000 형식)
 def get_age_by_birth_year(birth_year):
     current_year = datetime.now().year
     try:
@@ -98,7 +98,7 @@ def format_time(seconds):
     except:
         return str(seconds)
 
-# 4-1. Gemini AI 사진 OCR 분석 함수 (자동 재시도 및 예외 처리 적용)
+# 4-1. Gemini AI 사진 OCR 분석 함수 (모델을 gemini-3.6-flash로 수정 반영)
 def extract_lab_records_from_image(image_bytes):
     api_key = "AQ.Ab8RN6IOZwJSyzVUc78D2ov1KqV5wIRnV5x7_H8pYAOejbacgQ"
     client = genai.Client(api_key=api_key)
@@ -126,7 +126,7 @@ def extract_lab_records_from_image(image_bytes):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.6-flash',
                 contents=[
                     types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
                     prompt
@@ -528,7 +528,7 @@ elif main_menu == "1. 개인별 LAB Time Recorder":
         
         uploaded_record_image = st.file_uploader("기록지 사진 업로드", type=["jpg", "jpeg", "png"])
         
-        # 업로드한 사진 미리보기 추가 (확인 불가 문제 해결)
+        # 업로드한 사진 미리보기 기능
         if uploaded_record_image is not None:
             st.image(uploaded_record_image, caption="업로드한 기록지 사진 미리보기", use_container_width=True)
         
@@ -669,7 +669,7 @@ elif is_admin and main_menu == "6. 👥 회원 승인 및 관리 (관리자 전�
     users_df = pd.DataFrame([{"아이디": uid, **udata} for uid, udata in st.session_state.users.items()])
     st.dataframe(users_df, use_container_width=True)
 
-    # 회원 삭제 기능 추가
+    # 회원 삭제 기능
     st.markdown("#### 🗑️ 회원 삭제")
     target_delete_id = st.selectbox("삭제할 회원 아이디 선택", options=list(st.session_state.users.keys()))
     if target_delete_id == "admin":
