@@ -131,14 +131,13 @@ def extract_lab_records_from_image(image_bytes):
         
         except Exception as e:
             err_str = str(e)
-            # 503(UNAVAILABLE) 또는 429(RATE_LIMIT) 등의 서버 과부하 관련 오류인 경우 재시도
             if ("503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str) and attempt < max_retries - 1:
                 time.sleep(delay)
-                delay *= 2  # 지수 백오프: 대기 시간을 2배로 증가 (2초 -> 4초 -> 8초)
+                delay *= 2  
                 continue
             else:
                 if attempt == max_retries - 1:
-                    return None, f"서버 과부하로 인해 {max_retries회 시도가 모두 실패했습니다. 상세 오류: {err_str}"
+                    return None, f"서버 과부하로 인해 {max_retries}회 시도가 모두 실패했습니다. 상세 오류: {err_str}"
                 return None, err_str
 
 # 5. Session State 초기화
